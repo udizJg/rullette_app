@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ruleta · AMO Guacamole</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Montserrat:wght@700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <p class="subtitle" id="statusLine">Cargando…</p>
+      </header>
+
+      <section class="wheel-stage" aria-live="polite">
+        <div class="wheel-frame">
+          <div class="pointer" aria-hidden="true">
+          </div>
+          <div class="wheel-rim">
+            <div class="wheel-spin" id="wheelSpin">
+              <img
+                class="wheel-img"
+                id="wheelImg"
+                src="/assets/wheel.svg"
+                alt="Ruleta de premios"
+                draggable="false"
+              />
+            </div>
+          </div>
+          <div class="pointer-cover" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <button type="button" class="spin-btn" id="spinBtn" disabled>
+          <span class="spin-btn__label">Girar ruleta</span>
+        </button>
+        <p class="result" id="resultMsg"></p>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  ruleta-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ruleta-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_DIR: ./data
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
