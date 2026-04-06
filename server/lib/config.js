@@ -1,56 +1,91 @@
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'
 
-dotenv.config();
+dotenv.config()
 
-const PRIZE_KEYS = [
-  'pelota_corazon',
-  'tote',
-  'llavero',
-  'botella',
-  'stickers',
-  'morral',
-  'lonchera',
-];
+const PRIZE_KEYS = ['pelota_corazon', 'tote', 'llavero', 'botella', 'stickers', 'morral', 'lonchera']
 
 function envInt(name, fallback) {
-  const v = process.env[name];
-  if (v === undefined || v === '') return fallback;
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? n : fallback;
+  const v = process.env[name]
+  if (v === undefined || v === '') return fallback
+  const n = parseInt(v, 10)
+  return Number.isFinite(n) ? n : fallback
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const WIN_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/
+
+/**
+ * Fechas dispersas: cada segmento es fecha,ventana,tote
+ * (separador de días: |). tote 1 = hay cupo tote ese día (PRIZE_TOTE).
+ */
+export function parseCampaignSchedule(raw) {
+  const segments = raw
+    .split('|')
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (segments.length === 0) {
+    throw new Error('CAMPAIGN_SCHEDULE vacío')
+  }
+  const entries = segments.map((seg, i) => {
+    const parts = seg.split(',').map(p => p.trim())
+    if (parts.length !== 3) {
+      throw new Error(`CAMPAIGN_SCHEDULE segmento ${i + 1}: usar fecha,HH:mm-HH:mm,0|1`)
+    }
+    const [dayKey, winStr, toteStr] = parts
+    if (!DATE_RE.test(dayKey)) {
+      throw new Error(`CAMPAIGN_SCHEDULE fecha inválida: "${dayKey}"`)
+    }
+    const wm = winStr.match(WIN_RE)
+    if (!wm) {
+      throw new Error(`CAMPAIGN_SCHEDULE ventana inválida: "${winStr}"`)
+    }
+    if (toteStr !== '0' && toteStr !== '1') {
+      throw new Error(`CAMPAIGN_SCHEDULE tote debe ser 0 o 1 (segmento ${i + 1})`)
+    }
+    const toteEligible = toteStr === '1'
+    return {
+      dayKey,
+      window: {
+        start: `${wm[1]}:${wm[2]}`,
+        end: `${wm[3]}:${wm[4]}`
+      },
+      toteEligible
+    }
+  })
+  entries.sort((a, b) => a.dayKey.localeCompare(b.dayKey))
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i].dayKey === entries[i - 1].dayKey) {
+      throw new Error(`CAMPAIGN_SCHEDULE fecha duplicada: ${entries[i].dayKey}`)
+    }
+  }
+  return entries
+}
 
 export function parseDailyWindows(raw, expectedCount) {
   if (!raw || typeof raw !== 'string') {
-    throw new Error('DAILY_WINDOWS no definido o inválido');
+    throw new Error('DAILY_WINDOWS no definido o inválido')
   }
-  const parts = raw.split('|').map((s) => s.trim()).filter(Boolean);
+  const parts = raw
+    .split('|')
+    .map(s => s.trim())
+    .filter(Boolean)
   if (parts.length !== expectedCount) {
-    throw new Error(
-      `DAILY_WINDOWS debe tener ${expectedCount} segmentos (tiene ${parts.length})`,
-    );
+    throw new Error(`DAILY_WINDOWS debe tener ${expectedCount} segmentos (tiene ${parts.length})`)
   }
-  const timeRe = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
+  const timeRe = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/
   return parts.map((p, i) => {
-    const m = p.match(timeRe);
+    const m = p.match(timeRe)
     if (!m) {
-      throw new Error(`DAILY_WINDOWS segmento ${i + 1} inválido: "${p}"`);
+      throw new Error(`DAILY_WINDOWS segmento ${i + 1} inválido: "${p}"`)
     }
-    return { start: `${m[1]}:${m[2]}`, end: `${m[3]}:${m[4]}` };
-  });
+    return { start: `${m[1]}:${m[2]}`, end: `${m[3]}:${m[4]}` }
+  })
 }
 
 export function loadConfig() {
-  const nodeEnv = (process.env.NODE_ENV || 'production').toLowerCase();
-  const tz = process.env.TZ || 'America/Santiago';
-  const campaignStart = process.env.CAMPAIGN_START;
-  if (!campaignStart || !/^\d{4}-\d{2}-\d{2}$/.test(campaignStart)) {
-    throw new Error('CAMPAIGN_START debe ser YYYY-MM-DD');
-  }
-  const daysTotal = envInt('DAYS_TOTAL', 11);
-  if (daysTotal < 1) throw new Error('DAYS_TOTAL debe ser >= 1');
-
-  const dailyWindows = parseDailyWindows(process.env.DAILY_WINDOWS, daysTotal);
+  const nodeEnv = (process.env.NODE_ENV || 'production').toLowerCase()
+  const tz = process.env.TZ || 'America/Santiago'
+  const scheduleRaw = (process.env.CAMPAIGN_SCHEDULE || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -59,17 +94,48 @@ export function loadConfig() {
     botella: envInt('PRIZE_BOTELLA', 2),
     stickers: envInt('PRIZE_STICKERS', 30),
     morral: envInt('PRIZE_MORRAL', 10),
-    lonchera: envInt('PRIZE_LONCHERA', 2),
-  };
+    lonchera: envInt('PRIZE_LONCHERA', 2)
+  }
 
-  // Tote: “día de por medio”.
-  // Para 11 días: first day = 3 e intervalo = 2 => días 3,5,7,9,11 (5 totes).
-  const toteFirstDayIndex = envInt('TOTE_FIRST_DAY_INDEX', 3);
-  const toteIntervalDays = envInt('TOTE_INTERVAL_DAYS', 2);
+  if (scheduleRaw) {
+    const campaignSchedule = parseCampaignSchedule(scheduleRaw)
+    const campaignStart = campaignSchedule[0].dayKey
+    const daysTotal = campaignSchedule.length
+    return {
+      nodeEnv,
+      tz,
+      campaignMode: 'schedule',
+      campaignSchedule,
+      campaignStart,
+      daysTotal,
+      dailyWindows: null,
+      defaultLimits,
+      toteFirstDayIndex: null,
+      toteIntervalDays: null,
+      port: envInt('PORT', 3000),
+      dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
+      wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
+      prizeKeys: PRIZE_KEYS
+    }
+  }
+
+  const campaignStart = process.env.CAMPAIGN_START
+  if (!campaignStart || !DATE_RE.test(campaignStart)) {
+    throw new Error('CAMPAIGN_START debe ser YYYY-MM-DD (o define CAMPAIGN_SCHEDULE)')
+  }
+  const daysTotal = envInt('DAYS_TOTAL', 11)
+  if (daysTotal < 1) throw new Error('DAYS_TOTAL debe ser >= 1')
+
+  const dailyWindows = parseDailyWindows(process.env.DAILY_WINDOWS, daysTotal)
+
+  const toteFirstDayIndex = envInt('TOTE_FIRST_DAY_INDEX', 3)
+  const toteIntervalDays = envInt('TOTE_INTERVAL_DAYS', 2)
 
   return {
     nodeEnv,
     tz,
+    campaignMode: 'legacy',
+    campaignSchedule: null,
     campaignStart,
     daysTotal,
     dailyWindows,
@@ -78,8 +144,7 @@ export function loadConfig() {
     toteIntervalDays,
     port: envInt('PORT', 3000),
     dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
-    // Ruta local (en dev) o a un archivo dentro del repo (en prod) para servir el SVG del wheel.
     wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
-    prizeKeys: PRIZE_KEYS,
-  };
+    prizeKeys: PRIZE_KEYS
+  }
 }
