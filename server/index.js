@@ -8,6 +8,7 @@ import { campaignDayIndex, isWithinWindow, resolveScheduleDay } from './lib/sche
 import { createStore } from './lib/store.js'
 import { PRIZE_LABELS, availablePrizeKeys } from './lib/prizes.js'
 import { applySpinMutation, participantKeyFromBody } from './lib/spinService.js'
+import { applyChicureoSpinMutation, CHICUREO_PRIZE_LABELS } from './lib/chicureoSpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -142,6 +143,40 @@ function cleanupOldDevLogs(dayKey) {
   }
 }
 
+function cleanupChicureoDevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('chicureo-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `chicureo-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs Chicureo de dev:', err?.message || err)
+  }
+}
+
+function writeChicureoSpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupChicureoDevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `chicureo-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[CHICUREO][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log Chicureo:', err?.message || err)
+  }
+}
+
 function writeSpinLog(dayKey, entry) {
   try {
     fs.mkdirSync(logsDir, { recursive: true })
@@ -233,6 +268,46 @@ function getDaySnapshot(dayKey, toteEligibleForDay) {
   const inv = { ...d.inventory }
   if (!toteEligibleForDay) inv.tote = 0
   return { inventory: inv, spins: { ...d.spins } }
+}
+
+function chicureoNowContext() {
+  if (!config.chicureo) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.chicureo.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getChicureoDaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.chicureo?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.chicureo.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
 }
 
 app.get('/api/status', (req, res) => {
@@ -413,6 +488,205 @@ app.post('/api/spin', (req, res) => {
     })
 })
 
+function chicureoSoldOutAll(inventory) {
+  return !['libreta', 'parasol', 'lanyard'].some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+app.get('/api/chicureo/status', (req, res) => {
+  if (!config.chicureo) {
+    return res.json({
+      code: 'not_configured',
+      message: 'Chicureo no está configurado (CHICUREO_SCHEDULE).'
+    })
+  }
+
+  const ctx = chicureoNowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.chicureo.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getChicureoDaySnapshot(dayKey)
+  const soldOutAll = chicureoSoldOutAll(snap.inventory)
+  const enforceOnePerParticipant = false
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    const pk = participantKeyFromBody(anonId, fpId)
+    const played = enforceOnePerParticipant ? Boolean(snap.spins[pk]) : false
+    participantStatus = {
+      canSpin: effectiveWin.active && !soldOutAll && !played,
+      alreadyPlayed: played
+    }
+  }
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.chicureo.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    labels: CHICUREO_PRIZE_LABELS,
+    soldOutAll,
+    participantStatus
+  })
+})
+
+app.post('/api/chicureo/spin', (req, res) => {
+  if (!config.chicureo) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'Chicureo no está configurado.'
+    })
+  }
+
+  const ctx = chicureoNowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  if (isDevelopment) {
+    try {
+      const state = store.readSync()
+      const shadowState = JSON.parse(JSON.stringify(state))
+      const prevDay = shadowState.chicureo?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.chicureo.defaultLimits }
+      const result = applyChicureoSpinMutation(shadowState, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.chicureo.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const prize = result.payload?.prize ?? null
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prize)
+      writeChicureoSpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/chicureo/spin',
+        code: result.payload?.code || 'unknown',
+        prize,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return res.status(result.httpStatus).json(result.payload)
+    } catch (err) {
+      console.error(err)
+      return res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    }
+  }
+
+  store
+    .runMutation(state => {
+      const prevDay = state.chicureo?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.chicureo.defaultLimits }
+      const result = applyChicureoSpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.chicureo.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const prize = result.payload?.prize ?? null
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prize)
+      writeChicureoSpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/chicureo/spin',
+        code: result.payload?.code || 'unknown',
+        prize,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
+// Orden CW desde el puntero (ruleta2 + mcdonald.svg). Alinear con app2.js.
+const SPIN2_SEGMENT_PRIZES = [
+  'PREMIO SORPRESA',
+  'TIRA 1 VEZ MÁS',
+  'PREMIO SORPRESA',
+  'PREMIO SORPRESA',
+  'PREMIO SORPRESA',
+  'TIRA 1 VEZ MÁS',
+  'PREMIO SORPRESA',
+  'SIGUE PARTICIPANDO'
+]
+
+function spin2PickResult() {
+  const roll = Math.random()
+  let prize
+  if (roll < 0.5) prize = 'SIGUE PARTICIPANDO'
+  else if (roll < 0.75) prize = 'PREMIO SORPRESA'
+  else prize = 'TIRA 1 VEZ MÁS'
+
+  const indices = []
+  for (let i = 0; i < SPIN2_SEGMENT_PRIZES.length; i += 1) {
+    if (SPIN2_SEGMENT_PRIZES[i] === prize) indices.push(i)
+  }
+  const segmentIndex = indices[Math.floor(Math.random() * indices.length)]
+  return { prize, segmentIndex }
+}
+
+app.get('/api/spin2', (_req, res) => {
+  res.json(spin2PickResult())
+})
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
@@ -423,5 +697,14 @@ app.listen(config.port, () => {
     console.log(`TZ=${config.tz} modo=schedule activaciones=${config.daysTotal} ` + `(primera=${config.campaignStart})`)
   } else {
     console.log(`TZ=${config.tz} inicio=${config.campaignStart} días=${config.daysTotal}`)
+  }
+  if (config.chicureo) {
+    const first = config.chicureo.schedule[0]?.dayKey
+    const last = config.chicureo.schedule[config.chicureo.schedule.length - 1]?.dayKey
+    const lim = config.chicureo.defaultLimits
+    console.log(
+      `Chicureo: ${config.chicureo.schedule.length} día(s) (${first} → ${last}) · ` +
+        `por día: libreta=${lim.libreta} parasol=${lim.parasol} lanyard=${lim.lanyard}`
+    )
   }
 })

@@ -61,6 +61,49 @@ export function parseCampaignSchedule(raw) {
   return entries
 }
 
+/**
+ * Activaciones Chicureo: solo fecha y ventana (sin flag tote).
+ * Formato: YYYY-MM-DD,HH:mm-HH:mm|... (separador de días: |).
+ */
+export function parseChicureoSchedule(raw) {
+  const segments = raw
+    .split('|')
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (segments.length === 0) {
+    throw new Error('CHICUREO_SCHEDULE vacío')
+  }
+  const entries = segments.map((seg, i) => {
+    const parts = seg.split(',').map(p => p.trim())
+    if (parts.length !== 2) {
+      throw new Error(`CHICUREO_SCHEDULE segmento ${i + 1}: usar fecha,HH:mm-HH:mm`)
+    }
+    const [dayKey, winStr] = parts
+    if (!DATE_RE.test(dayKey)) {
+      throw new Error(`CHICUREO_SCHEDULE fecha inválida: "${dayKey}"`)
+    }
+    const wm = winStr.match(WIN_RE)
+    if (!wm) {
+      throw new Error(`CHICUREO_SCHEDULE ventana inválida: "${winStr}"`)
+    }
+    return {
+      dayKey,
+      window: {
+        start: `${wm[1]}:${wm[2]}`,
+        end: `${wm[3]}:${wm[4]}`
+      },
+      toteEligible: false
+    }
+  })
+  entries.sort((a, b) => a.dayKey.localeCompare(b.dayKey))
+  for (let i = 1; i < entries.length; i += 1) {
+    if (entries[i].dayKey === entries[i - 1].dayKey) {
+      throw new Error(`CHICUREO_SCHEDULE fecha duplicada: ${entries[i].dayKey}`)
+    }
+  }
+  return entries
+}
+
 export function parseDailyWindows(raw, expectedCount) {
   if (!raw || typeof raw !== 'string') {
     throw new Error('DAILY_WINDOWS no definido o inválido')
@@ -86,6 +129,7 @@ export function loadConfig() {
   const nodeEnv = (process.env.NODE_ENV || 'production').toLowerCase()
   const tz = process.env.TZ || 'America/Santiago'
   const scheduleRaw = (process.env.CAMPAIGN_SCHEDULE || '').trim()
+  const chicureoScheduleRaw = (process.env.CHICUREO_SCHEDULE || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -95,6 +139,24 @@ export function loadConfig() {
     stickers: envInt('PRIZE_STICKERS', 30),
     morral: envInt('PRIZE_MORRAL', 10),
     lonchera: envInt('PRIZE_LONCHERA', 2)
+  }
+
+  const chicureoDefaultLimits = {
+    libreta: envInt('CHICUREO_PRIZE_LIBRETA', 3),
+    parasol: envInt('CHICUREO_PRIZE_PARASOL', 20),
+    lanyard: envInt('CHICUREO_PRIZE_LANYARD', 99)
+  }
+  const chicureo = chicureoScheduleRaw
+    ? {
+        schedule: parseChicureoSchedule(chicureoScheduleRaw),
+        defaultLimits: chicureoDefaultLimits
+      }
+    : null
+  if (chicureo && chicureo.schedule.length !== 6) {
+    console.warn(
+      `CHICUREO_SCHEDULE tiene ${chicureo.schedule.length} día(s); ` +
+        'se esperaban 6 (3 locales × 2 días). Revisa la configuración.'
+    )
   }
 
   if (scheduleRaw) {
@@ -115,7 +177,8 @@ export function loadConfig() {
       port: envInt('PORT', 3000),
       dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
       wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
-      prizeKeys: PRIZE_KEYS
+      prizeKeys: PRIZE_KEYS,
+      chicureo
     }
   }
 
@@ -145,6 +208,7 @@ export function loadConfig() {
     port: envInt('PORT', 3000),
     dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
     wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
-    prizeKeys: PRIZE_KEYS
+    prizeKeys: PRIZE_KEYS,
+    chicureo
   }
 }

@@ -16,7 +16,11 @@
   --accent-bright: #62d655;
   --accent-dim: var(--guac-green-dark);
   --shadow-deep: rgba(0, 0, 0, 0.55);
-  font-family: "Montserrat", system-ui, -apple-system, sans-serif;
+  font-family:
+    'Montserrat',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 *,
@@ -59,7 +63,7 @@ body {
 
 .title {
   margin: 6px 0 0;
-  font-family: "Montserrat", sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: clamp(1.65rem, 5vw, 2.1rem);
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -152,7 +156,7 @@ body {
 
 /* Fredoka One: estilo cartoon redondeado*/
 .wheel-caption {
-  font-family: "Fredoka One", "Fredoka", cursive, sans-serif;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
   font-size: 5.4px;
   letter-spacing: 0.02em;
   fill: #ffffff;
@@ -175,7 +179,7 @@ body {
 
 .pointer {
   position: absolute;
-  top: 1.0%;
+  top: 1%;
   left: 50%;
   z-index: 6;
   transform: translateX(-50%) rotate(0deg);
@@ -191,7 +195,7 @@ body {
 
 /* Borde negro alrededor del triángulo  */
 .pointer::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: -12%;
   background: #000000;
@@ -201,7 +205,7 @@ body {
 
 /* Relleno blanco del triángulo */
 .pointer::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 10%;
   background: #ffffff;
@@ -243,7 +247,6 @@ body {
   }
 }
 
-
 .panel {
   text-align: center;
 }
@@ -254,7 +257,7 @@ body {
   border: none;
   border-radius: 999px;
   padding: 16px 40px;
-  font-family: "Montserrat", sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: clamp(1.02rem, 3.2vw, 1.12rem);
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -267,7 +270,10 @@ body {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.55) inset,
     0 14px 28px rgba(77, 177, 67, 0.45);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
 
 .spin-btn:hover:not(:disabled) {
@@ -310,7 +316,7 @@ body {
 
 .result--prize {
   color: #ffffff;
-  font-family: "Fredoka One", "Fredoka", cursive, sans-serif;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
   font-weight: 700;
   text-align: center;
   letter-spacing: 0.02em;
@@ -325,7 +331,7 @@ body {
 
 .prize-announce__bottom {
   display: block;
-  font-size: clamp(1.0rem, 3.6vw, 1.2rem);
+  font-size: clamp(1rem, 3.6vw, 1.2rem);
   margin-top: -6px;
   line-height: 0.95;
 }
@@ -366,6 +372,138 @@ body {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
   }
+}
+
+/* ── Tema claro (ruleta 2) ── */
+body.ruleta2 {
+  background-color: #ffffff;
+  background-image: none;
+  color: #1a1a1a;
+}
+
+body.ruleta2 .subtitle {
+  color: #555;
+}
+
+body.ruleta2 .result {
+  color: #555;
+}
+
+body.ruleta2 .result--prize {
+  color: #1a1a1a;
+  text-shadow: 0 2px 12px rgba(214, 16, 22, 0.2);
+}
+
+/*
+  Ruleta 3: mismo dramatismo que ruleta 1 (fondo oscuro + halo superior),
+  pero halo y degradé en rojo (McDonald’s / Chicureo) en vez de verde.
+*/
+body.ruleta3 {
+  color: var(--text);
+  background-color: #120a0a;
+  background-image:
+    radial-gradient(ellipse 130% 90% at 50% -15%, rgba(214, 16, 22, 0.32) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(0, 0, 0, 0.35) 0%, transparent 45%),
+    linear-gradient(180deg, #1c1010 0%, #120a0a 100%);
+}
+
+body.ruleta3 .subtitle {
+  color: #c9bcb8;
+}
+
+body.ruleta3 .result {
+  color: #e0d8d6;
+}
+
+body.ruleta3 .result--prize {
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(214, 16, 22, 0.45);
+}
+
+/* Triángulo redondeado vía SVG (stroke-linejoin round). */
+body.ruleta2 .pointer,
+body.ruleta3 .pointer {
+  clip-path: none;
+  overflow: visible;
+  background: transparent;
+}
+
+body.ruleta2 .pointer::before,
+body.ruleta3 .pointer::before {
+  display: none;
+}
+
+body.ruleta2 .pointer::after,
+body.ruleta3 .pointer::after {
+  inset: 0;
+  clip-path: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%23fab918' stroke='%23000000' stroke-width='5' stroke-linejoin='round' stroke-linecap='round' paint-order='stroke fill' d='M 50 90 L 17 23 L 83 23 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+body.ruleta2 .pointer-cover,
+body.ruleta3 .pointer-cover {
+  clip-path: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%23d61016' d='M 50 90 L 17 23 L 83 23 Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+/*
+  Ruleta 2/3: SVG en el DOM (no img) + clip circular único. aspect-ratio evita CLS
+  mientras llega el fetch. geometricPrecision prioriza forma sobre velocidad.
+*/
+body.ruleta2 .wheel-spin,
+body.ruleta3 .wheel-spin {
+  will-change: auto;
+  overflow: hidden;
+  aspect-ratio: 1;
+  width: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+body.ruleta2 .wheel-spin--loading,
+body.ruleta3 .wheel-spin--loading {
+  opacity: 0.94;
+}
+
+body.ruleta2 .wheel-spin.wheel-spin--animating,
+body.ruleta3 .wheel-spin.wheel-spin--animating {
+  will-change: transform;
+}
+
+body.ruleta2 .wheel-spin svg.wheel-svg-inline,
+body.ruleta3 .wheel-spin svg.wheel-svg-inline,
+body.ruleta2 .wheel-img,
+body.ruleta3 .wheel-img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+}
+
+.spin-btn--red {
+  color: #ffffff;
+  background: linear-gradient(180deg, #ff4d50 0%, #d61016 28%, #a50d12 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 14px 28px rgba(214, 16, 22, 0.45);
+}
+
+.spin-btn--red:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 18px 36px rgba(214, 16, 22, 0.6);
 }
 
 @media (prefers-reduced-motion: reduce) {
