@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "NODE_ENV=development node --watch server/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

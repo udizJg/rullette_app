@@ -8,7 +8,7 @@ import { campaignDayIndex, isWithinWindow, resolveScheduleDay } from './lib/sche
 import { createStore } from './lib/store.js'
 import { PRIZE_LABELS, availablePrizeKeys } from './lib/prizes.js'
 import { applySpinMutation, participantKeyFromBody } from './lib/spinService.js'
-import { applyChicureoSpinMutation, CHICUREO_PRIZE_LABELS } from './lib/chicureoSpinService.js'
+import { applyChicureoSpinMutation, CHICUREO_PRIZE_LABELS, CHICUREO_PRIZE_KEYS } from './lib/chicureoSpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -310,6 +310,24 @@ function getChicureoDaySnapshot(dayKey) {
   return { inventory: { ...d.inventory }, spins: { ...d.spins } }
 }
 
+/** Premios entregados hoy = cupo diario − remaining (cada ok baja 1 unidad). */
+function buildChicureoDayStats(inventory, defaultLimits) {
+  const delivered = {}
+  let totalSpins = 0
+  for (const k of CHICUREO_PRIZE_KEYS) {
+    const cap = defaultLimits[k] ?? 0
+    const left = inventory[k] ?? 0
+    const n = Math.max(0, cap - left)
+    delivered[k] = n
+    totalSpins += n
+  }
+  return {
+    dailyInitial: { ...defaultLimits },
+    delivered,
+    totalSpins
+  }
+}
+
 app.get('/api/status', (req, res) => {
   const ctx = nowContext()
   if (!ctx.ok) {
@@ -514,6 +532,8 @@ app.get('/api/chicureo/status', (req, res) => {
   const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
   const snap = getChicureoDaySnapshot(dayKey)
   const soldOutAll = chicureoSoldOutAll(snap.inventory)
+  const defaultChicureo = config.chicureo.defaultLimits
+  const stats = buildChicureoDayStats(snap.inventory, defaultChicureo)
   const enforceOnePerParticipant = false
 
   let participantStatus = null
@@ -542,6 +562,7 @@ app.get('/api/chicureo/status', (req, res) => {
       end: effectiveWin.endExclusive?.toISO() ?? null
     },
     remaining: snap.inventory,
+    stats,
     labels: CHICUREO_PRIZE_LABELS,
     soldOutAll,
     participantStatus
@@ -586,40 +607,8 @@ app.post('/api/chicureo/spin', (req, res) => {
   const participantKey = participantKeyFromBody(anonId, fpId)
   const enforceOnePerParticipant = false
 
-  if (isDevelopment) {
-    try {
-      const state = store.readSync()
-      const shadowState = JSON.parse(JSON.stringify(state))
-      const prevDay = shadowState.chicureo?.days?.[dayKey]
-      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.chicureo.defaultLimits }
-      const result = applyChicureoSpinMutation(shadowState, {
-        dayKey,
-        participantKey,
-        idempotencyKey,
-        defaultLimits: config.chicureo.defaultLimits,
-        enforceOnePerParticipant
-      })
-      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
-      const prize = result.payload?.prize ?? null
-      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prize)
-      writeChicureoSpinLog(dayKey, {
-        at: new Date().toISOString(),
-        mode: config.nodeEnv,
-        endpoint: '/api/chicureo/spin',
-        code: result.payload?.code || 'unknown',
-        prize,
-        segmentIndex: result.payload?.segmentIndex,
-        inventoryBefore: beforeInventory,
-        inventoryAfter: afterInventory,
-        deltaValidation: deltaCheck
-      })
-      return res.status(result.httpStatus).json(result.payload)
-    } catch (err) {
-      console.error(err)
-      return res.status(500).json({ code: 'server_error', message: 'Error interno' })
-    }
-  }
-
+  // Chicureo siempre persiste (también en NODE_ENV=development) para que inventario,
+  // stats y logs coincidan al probar con DATA_DIR=./data-dev.
   store
     .runMutation(state => {
       const prevDay = state.chicureo?.days?.[dayKey]

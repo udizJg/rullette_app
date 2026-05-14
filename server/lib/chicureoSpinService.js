@@ -13,13 +13,13 @@ export const CHICUREO_PRIZE_LABELS = {
  * Si en el lugar el puntero no coincide con el mensaje, ajustar esta lista.
  */
 export const CHICUREO_SEGMENT_PRIZES = [
-  'libreta',
-  'parasol',
   'lanyard',
-  'libreta',
   'parasol',
-  'lanyard',
   'libreta',
+  'lanyard',
+  'parasol',
+  'libreta',
+  'lanyard',
   'parasol'
 ]
 

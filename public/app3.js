@@ -9,7 +9,7 @@ const SEGMENT_COUNT = 8
 const POINTER_ANGLE_DEG = 270
 const SEGMENT_STEP_DEG = 360 / SEGMENT_COUNT
 
-const SEGMENT_ORDER_CLOCKWISE = ['libreta', 'parasol', 'lanyard', 'libreta', 'parasol', 'lanyard', 'libreta', 'parasol']
+const SEGMENT_ORDER_CLOCKWISE = ['lanyard', 'parasol', 'libreta', 'lanyard', 'parasol', 'libreta', 'lanyard', 'parasol']
 
 const STORAGE_ANON = 'ruleta3_chicureo_anon_id'
 const POLL_MS = 5000
@@ -335,8 +335,9 @@ function applyStatusToUi(st) {
   const outside = !st.window.active
   const played = st.participantStatus?.alreadyPlayed
 
+  // Mientras el candado está activo no tocamos el botón: el click y el timer del
+  // premio son la fuente de verdad; un poll intermedio re-deshabilitaba tras el exit.
   if (isResultMessageLocked()) {
-    spinBtn.disabled = true
     return
   }
 
@@ -447,7 +448,7 @@ spinBtn.addEventListener('click', async () => {
     resultMsg.textContent = ''
     await animateToPrize(data.prize, data.segmentIndex)
     showPrizeAnnouncement(data.prize, data.label)
-    lockResultMessageUntil = Date.now() + PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 220
+    lockResultMessageUntil = Date.now() + PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 800
     window.setTimeout(() => poll(), PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 120)
     return
   }

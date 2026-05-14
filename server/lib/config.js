@@ -1,6 +1,18 @@
 import dotenv from 'dotenv'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-dotenv.config()
+const __configDir = path.dirname(fileURLToPath(import.meta.url))
+const __repoRoot = path.join(__configDir, '..', '..')
+
+dotenv.config({ path: path.join(__repoRoot, '.env') })
+if ((process.env.NODE_ENV || '').toLowerCase() === 'development') {
+  const devFile = path.join(__repoRoot, '.env.development')
+  if (fs.existsSync(devFile)) {
+    dotenv.config({ path: devFile, override: true })
+  }
+}
 
 const PRIZE_KEYS = ['pelota_corazon', 'tote', 'llavero', 'botella', 'stickers', 'morral', 'lonchera']
 
@@ -152,11 +164,13 @@ export function loadConfig() {
         defaultLimits: chicureoDefaultLimits
       }
     : null
-  if (chicureo && chicureo.schedule.length !== 6) {
-    console.warn(
-      `CHICUREO_SCHEDULE tiene ${chicureo.schedule.length} día(s); ` +
-        'se esperaban 6 (3 locales × 2 días). Revisa la configuración.'
-    )
+  if (chicureo) {
+    const n = chicureo.schedule.length
+    if (n !== 6) {
+      console.info(
+        `Chicureo: ${n} día(s) en CHICUREO_SCHEDULE. ` + 'Si la campaña suma más fechas, añádelas separadas por |.'
+      )
+    }
   }
 
   if (scheduleRaw) {
