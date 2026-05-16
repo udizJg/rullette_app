@@ -9,6 +9,7 @@ import { createStore } from './lib/store.js'
 import { PRIZE_LABELS, availablePrizeKeys } from './lib/prizes.js'
 import { applySpinMutation, participantKeyFromBody } from './lib/spinService.js'
 import { applyChicureoSpinMutation, CHICUREO_PRIZE_LABELS, CHICUREO_PRIZE_KEYS } from './lib/chicureoSpinService.js'
+import { applyRuleta4SpinMutation, RULETA4_PRIZE_KEYS, RULETA4_RESULT_LABELS } from './lib/ruleta4SpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -159,6 +160,22 @@ function cleanupChicureoDevLogs(dayKey) {
   }
 }
 
+function cleanupRuleta4DevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('ruleta4-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `ruleta4-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs ruleta 4 de dev:', err?.message || err)
+  }
+}
+
 function writeChicureoSpinLog(dayKey, entry) {
   try {
     fs.mkdirSync(logsDir, { recursive: true })
@@ -174,6 +191,24 @@ function writeChicureoSpinLog(dayKey, entry) {
     console.log(`[CHICUREO][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
   } catch (err) {
     console.error('No se pudo escribir log Chicureo:', err?.message || err)
+  }
+}
+
+function writeRuleta4SpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupRuleta4DevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `ruleta4-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[RULETA4][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log ruleta 4:', err?.message || err)
   }
 }
 
@@ -308,6 +343,68 @@ function getChicureoDaySnapshot(dayKey) {
     return { inventory: { ...config.chicureo.defaultLimits }, spins: {} }
   }
   return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
+function ruleta4NowContext() {
+  if (!config.ruleta4) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.ruleta4.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getRuleta4DaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.ruleta4?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.ruleta4.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
+function ruleta4SoldOutAll(inventory) {
+  return !RULETA4_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+/** Estadísticas del día solo para premios físicos (sin «Siga participando»). */
+function buildRuleta4DayStats(inventory, defaultLimits) {
+  const delivered = {}
+  let totalPhysicalSpins = 0
+  for (const k of RULETA4_PRIZE_KEYS) {
+    const cap = defaultLimits[k] ?? 0
+    const left = inventory[k] ?? 0
+    const n = Math.max(0, cap - left)
+    delivered[k] = n
+    totalPhysicalSpins += n
+  }
+  return {
+    dailyInitial: { ...defaultLimits },
+    delivered,
+    totalPhysicalSpins
+  }
 }
 
 /** Premios entregados hoy = cupo diario − remaining (cada ok baja 1 unidad). */
@@ -645,6 +742,139 @@ app.post('/api/chicureo/spin', (req, res) => {
     })
 })
 
+app.get('/api/ruleta4/status', (req, res) => {
+  if (!config.ruleta4) {
+    return res.json({
+      code: 'not_configured',
+      message: 'Ruleta Guacamole no está configurada (RULETA4_SCHEDULE).'
+    })
+  }
+
+  const ctx = ruleta4NowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.ruleta4.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getRuleta4DaySnapshot(dayKey)
+  const soldOutPhysical = ruleta4SoldOutAll(snap.inventory)
+  const defaultR4 = config.ruleta4.defaultLimits
+  const stats = buildRuleta4DayStats(snap.inventory, defaultR4)
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    participantStatus = {
+      // La tienda controla cuántos giros hace cada persona; el servidor solo exige ventana horaria.
+      canSpin: effectiveWin.active,
+      alreadyPlayed: false,
+      soldOutPhysical
+    }
+  }
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.ruleta4.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    stats,
+    labels: RULETA4_RESULT_LABELS,
+    soldOutPhysical,
+    participantStatus
+  })
+})
+
+app.post('/api/ruleta4/spin', (req, res) => {
+  if (!config.ruleta4) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'Ruleta Guacamole no está configurada.'
+    })
+  }
+
+  const ctx = ruleta4NowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  store
+    .runMutation(state => {
+      const prevDay = state.ruleta4?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.ruleta4.defaultLimits }
+      const result = applyRuleta4SpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.ruleta4.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const rawPrize = result.payload?.prize
+      const prizeForDelta = rawPrize === 'siga_participando' ? null : (rawPrize ?? null)
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prizeForDelta)
+      writeRuleta4SpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/ruleta4/spin',
+        code: result.payload?.code || 'unknown',
+        prize: rawPrize ?? null,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
 // Orden CW desde el puntero (ruleta2 + mcdonald.svg). Alinear con app2.js.
 const SPIN2_SEGMENT_PRIZES = [
   'PREMIO SORPRESA',
@@ -694,6 +924,16 @@ app.listen(config.port, () => {
     console.log(
       `Chicureo: ${config.chicureo.schedule.length} día(s) (${first} → ${last}) · ` +
         `por día: libreta=${lim.libreta} parasol=${lim.parasol} lanyard=${lim.lanyard}`
+    )
+  }
+  if (config.ruleta4) {
+    const first = config.ruleta4.schedule[0]?.dayKey
+    const last = config.ruleta4.schedule[config.ruleta4.schedule.length - 1]?.dayKey
+    const lim = config.ruleta4.defaultLimits
+    console.log(
+      `Ruleta 4 (Guacamole): ${config.ruleta4.schedule.length} día(s) (${first} → ${last}) · ` +
+        `stock/día: stickers=${lim.stickers} botella=${lim.botella} pelota=${lim.pelota_corazon} ` +
+        `llavero=${lim.llavero} morral=${lim.morral} lonchera=${lim.lonchera}`
     )
   }
 })

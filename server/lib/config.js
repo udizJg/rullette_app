@@ -142,6 +142,7 @@ export function loadConfig() {
   const tz = process.env.TZ || 'America/Santiago'
   const scheduleRaw = (process.env.CAMPAIGN_SCHEDULE || '').trim()
   const chicureoScheduleRaw = (process.env.CHICUREO_SCHEDULE || '').trim()
+  const ruleta4ScheduleRaw = (process.env.RULETA4_SCHEDULE || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -164,6 +165,22 @@ export function loadConfig() {
         defaultLimits: chicureoDefaultLimits
       }
     : null
+
+  const ruleta4DefaultLimits = {
+    stickers: envInt('RULETA4_PRIZE_STICKERS', 24),
+    botella: envInt('RULETA4_PRIZE_BOTELLA', 2),
+    pelota_corazon: envInt('RULETA4_PRIZE_PELOTA', 40),
+    llavero: envInt('RULETA4_PRIZE_LLAVERO', 23),
+    morral: envInt('RULETA4_PRIZE_MORRAL', 10),
+    lonchera: envInt('RULETA4_PRIZE_LONCHERA', 2)
+  }
+  const ruleta4 = ruleta4ScheduleRaw
+    ? {
+        schedule: parseChicureoSchedule(ruleta4ScheduleRaw),
+        defaultLimits: ruleta4DefaultLimits
+      }
+    : null
+
   if (chicureo) {
     const n = chicureo.schedule.length
     if (n !== 6) {
@@ -192,7 +209,8 @@ export function loadConfig() {
       dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
       wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
       prizeKeys: PRIZE_KEYS,
-      chicureo
+      chicureo,
+      ruleta4
     }
   }
 
@@ -223,6 +241,7 @@ export function loadConfig() {
     dataDir: process.env.DATA_DIR || (nodeEnv === 'development' ? './data-dev' : './data'),
     wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
     prizeKeys: PRIZE_KEYS,
-    chicureo
+    chicureo,
+    ruleta4
   }
 }

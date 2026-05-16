@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ruleta Guacamole</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Montserrat:wght@700;800;900&display=swap"
+      rel="stylesheet" />
+    <link rel="preload" href="/assets/guacamole.svg" as="fetch" type="image/svg+xml" crossorigin="anonymous" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="ruleta4">
+    <div class="confetti-root" id="confettiRoot" aria-hidden="true"></div>
+    <main class="app">
+      <header class="header">
+        <p class="subtitle" id="statusLine">Cargando…</p>
+      </header>
+
+      <section class="wheel-stage" aria-live="polite">
+        <div class="wheel-frame">
+          <div class="pointer" aria-hidden="true"></div>
+          <div class="wheel-rim">
+            <div class="wheel-spin wheel-spin--loading" id="wheelSpin" aria-busy="true">
+              <!-- SVG incrustado por app4.js -->
+            </div>
+          </div>
+          <div class="pointer-cover" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <button type="button" class="spin-btn" id="spinBtn" disabled>
+          <span class="spin-btn__label">Girar</span>
+        </button>
+        <p class="result" id="resultMsg"></p>
+      </section>
+    </main>
+    <script src="/app4.js" type="module"></script>
+  </body>
+</html>
