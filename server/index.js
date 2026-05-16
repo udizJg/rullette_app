@@ -392,17 +392,20 @@ function ruleta4SoldOutAll(inventory) {
 /** Estadísticas del día solo para premios físicos (sin «Siga participando»). */
 function buildRuleta4DayStats(inventory, defaultLimits) {
   const delivered = {}
+  const perPrize = {}
   let totalPhysicalSpins = 0
   for (const k of RULETA4_PRIZE_KEYS) {
-    const cap = defaultLimits[k] ?? 0
-    const left = inventory[k] ?? 0
-    const n = Math.max(0, cap - left)
+    const initial = defaultLimits[k] ?? 0
+    const remaining = inventory[k] ?? 0
+    const n = Math.max(0, initial - remaining)
     delivered[k] = n
     totalPhysicalSpins += n
+    perPrize[k] = { initial, delivered: n, remaining }
   }
   return {
     dailyInitial: { ...defaultLimits },
     delivered,
+    perPrize,
     totalPhysicalSpins
   }
 }
@@ -779,6 +782,14 @@ app.get('/api/ruleta4/status', (req, res) => {
     }
   }
 
+  const physicalPrizes = RULETA4_PRIZE_KEYS.map(key => ({
+    key,
+    label: RULETA4_RESULT_LABELS[key] || key,
+    initialForDay: stats.perPrize[key].initial,
+    delivered: stats.perPrize[key].delivered,
+    remaining: stats.perPrize[key].remaining
+  }))
+
   return res.json({
     code: 'ok',
     tz: config.tz,
@@ -794,6 +805,7 @@ app.get('/api/ruleta4/status', (req, res) => {
     },
     remaining: snap.inventory,
     stats,
+    physicalPrizes,
     labels: RULETA4_RESULT_LABELS,
     soldOutPhysical,
     participantStatus
