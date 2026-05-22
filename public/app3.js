@@ -66,6 +66,58 @@ let wheelReady = false
 const PRIZE_ANNOUNCE_MS = 2500
 const PRIZE_EXIT_MS = 700
 
+const CONFETTI_COLORS = ['#fab918', '#ff4d50', '#ffffff', '#d61016', '#ff6b9d', '#fde047', '#fda4af', '#7dd3fc']
+
+let confettiCleanupTimer = null
+
+function clearConfettiLayer() {
+  if (confettiCleanupTimer) {
+    window.clearTimeout(confettiCleanupTimer)
+    confettiCleanupTimer = null
+  }
+  const root = document.getElementById('confettiRoot')
+  if (root) root.replaceChildren()
+}
+
+function launchConfetti() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  const root = document.getElementById('confettiRoot')
+  if (!root) return
+
+  clearConfettiLayer()
+
+  const count = 78
+  const maxDurSec = 4.6
+
+  for (let i = 0; i < count; i += 1) {
+    const el = document.createElement('span')
+    el.className = 'confetti-piece'
+    el.style.left = `${Math.random() * 100}%`
+    el.style.backgroundColor = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]
+
+    const w = 5 + Math.random() * 10
+    const h = 7 + Math.random() * 16
+    el.style.width = `${w}px`
+    el.style.height = `${h}px`
+    el.style.borderRadius = Math.random() > 0.45 ? '2px' : `${3 + Math.random() * 5}px`
+
+    const dur = 2.2 + Math.random() * (maxDurSec - 2.2)
+    el.style.animationDuration = `${dur}s`
+    el.style.animationDelay = `${Math.random() * 0.4}s`
+
+    const drift = (Math.random() - 0.5) * 220
+    const rot = Math.random() * 900 - 450
+    el.style.setProperty('--drift', `${drift}px`)
+    el.style.setProperty('--rot', `${rot}deg`)
+    el.style.opacity = String(0.88 + Math.random() * 0.12)
+
+    root.appendChild(el)
+  }
+
+  confettiCleanupTimer = window.setTimeout(() => clearConfettiLayer(), Math.ceil(maxDurSec * 1000) + 800)
+}
+
 function getOrCreateAnonId() {
   try {
     let id = localStorage.getItem(STORAGE_ANON)
@@ -246,6 +298,8 @@ function showPrizeAnnouncement(prizeKey, labelFromServer) {
   void resultMsg.offsetHeight
   resultMsg.classList.add('result--prize', 'result--prize--enter')
 
+  launchConfetti()
+
   prizeAnnouncementTimer = window.setTimeout(() => {
     resultMsg.classList.remove('result--prize--enter')
     resultMsg.classList.add('result--prize--exit')
@@ -262,6 +316,14 @@ function formatRemaining(ms) {
   const m = Math.floor((totalSec % 3600) / 60)
   const s = totalSec % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function outsideWindowMessage(st) {
+  const label = st?.window?.label
+  if (label) {
+    return `La ruleta solo está disponible en el horario de hoy (${label}).`
+  }
+  return 'La ruleta solo está disponible en el horario de hoy.'
 }
 
 function formatTodayCountdown(st) {
@@ -353,7 +415,7 @@ function applyStatusToUi(st) {
   }
 
   if (outside) {
-    resultMsg.textContent = 'La ruleta solo está disponible en el horario de hoy (13:00–15:00).'
+    resultMsg.textContent = outsideWindowMessage(st)
     spinBtn.disabled = true
     clearPrizeAnnouncementClasses()
     return

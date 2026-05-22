@@ -407,11 +407,32 @@ body.ruleta3 {
     linear-gradient(180deg, #1c1010 0%, #120a0a 100%);
 }
 
-body.ruleta3 .subtitle {
+/*
+  Ruleta 5 (Bellavista): misma estructura de halos que Chicureo,
+  paleta negro · blanco · rojo.
+*/
+body.ruleta5 {
+  color: var(--text);
+  background-color: #0a0a0a;
+  background-image:
+    radial-gradient(
+      ellipse 130% 90% at 50% -15%,
+      rgba(214, 16, 22, 0.36) 0%,
+      rgba(255, 255, 255, 0.08) 38%,
+      transparent 58%
+    ),
+    radial-gradient(ellipse 65% 48% at 0% 100%, rgba(255, 255, 255, 0.09) 0%, transparent 48%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(0, 0, 0, 0.45) 0%, transparent 45%),
+    linear-gradient(180deg, #1f1414 0%, #121212 45%, #0a0a0a 100%);
+}
+
+body.ruleta3 .subtitle,
+body.ruleta5 .subtitle {
   color: #c9bcb8;
 }
 
-body.ruleta3 .result {
+body.ruleta3 .result,
+body.ruleta5 .result {
   color: #e0d8d6;
 }
 
@@ -420,21 +441,34 @@ body.ruleta3 .result--prize {
   text-shadow: 0 2px 14px rgba(214, 16, 22, 0.45);
 }
 
+body.ruleta5 .result--prize {
+  color: #fff;
+  text-shadow:
+    0 2px 14px rgba(214, 16, 22, 0.5),
+    0 0 28px rgba(255, 255, 255, 0.12);
+}
+
 /* Triángulo redondeado vía SVG (stroke-linejoin round). */
 body.ruleta2 .pointer,
-body.ruleta3 .pointer {
+body.ruleta3 .pointer,
+body.ruleta5 .pointer,
+body.ruleta-arauco .pointer {
   clip-path: none;
   overflow: visible;
   background: transparent;
 }
 
 body.ruleta2 .pointer::before,
-body.ruleta3 .pointer::before {
+body.ruleta3 .pointer::before,
+body.ruleta5 .pointer::before,
+body.ruleta-arauco .pointer::before {
   display: none;
 }
 
 body.ruleta2 .pointer::after,
-body.ruleta3 .pointer::after {
+body.ruleta3 .pointer::after,
+body.ruleta5 .pointer::after,
+body.ruleta-arauco .pointer::after {
   inset: 0;
   clip-path: none;
   background-color: transparent;
@@ -445,7 +479,9 @@ body.ruleta3 .pointer::after {
 }
 
 body.ruleta2 .pointer-cover,
-body.ruleta3 .pointer-cover {
+body.ruleta3 .pointer-cover,
+body.ruleta5 .pointer-cover,
+body.ruleta-arauco .pointer-cover {
   clip-path: none;
   background-color: transparent;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%23d61016' d='M 50 90 L 17 23 L 83 23 Z'/%3E%3C/svg%3E");
@@ -459,7 +495,9 @@ body.ruleta3 .pointer-cover {
   mientras llega el fetch. geometricPrecision prioriza forma sobre velocidad.
 */
 body.ruleta2 .wheel-spin,
-body.ruleta3 .wheel-spin {
+body.ruleta3 .wheel-spin,
+body.ruleta5 .wheel-spin,
+body.ruleta-arauco .wheel-spin {
   will-change: auto;
   overflow: hidden;
   aspect-ratio: 1;
@@ -469,21 +507,29 @@ body.ruleta3 .wheel-spin {
 }
 
 body.ruleta2 .wheel-spin--loading,
-body.ruleta3 .wheel-spin--loading {
+body.ruleta3 .wheel-spin--loading,
+body.ruleta5 .wheel-spin--loading,
+body.ruleta-arauco .wheel-spin--loading {
   opacity: 0.94;
 }
 
 body.ruleta2 .wheel-spin.wheel-spin--animating,
-body.ruleta3 .wheel-spin.wheel-spin--animating {
+body.ruleta3 .wheel-spin.wheel-spin--animating,
+body.ruleta5 .wheel-spin.wheel-spin--animating,
+body.ruleta-arauco .wheel-spin.wheel-spin--animating {
   will-change: transform;
 }
 
 body.ruleta2 .wheel-spin svg.wheel-svg-inline,
 body.ruleta3 .wheel-spin svg.wheel-svg-inline,
 body.ruleta4 .wheel-spin svg.wheel-svg-inline,
+body.ruleta5 .wheel-spin svg.wheel-svg-inline,
+body.ruleta-arauco .wheel-spin svg.wheel-svg-inline,
 body.ruleta2 .wheel-img,
 body.ruleta3 .wheel-img,
-body.ruleta4 .wheel-img {
+body.ruleta4 .wheel-img,
+body.ruleta5 .wheel-img,
+body.ruleta-arauco .wheel-img {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -538,6 +584,46 @@ body.ruleta4 .prize-announce__message--siga {
   color: var(--text);
 }
 
+/* Confeti al mostrar premio (app3.js / app5.js), mismo patrón que ruleta 4. */
+body.ruleta3 .app,
+body.ruleta5 .app {
+  position: relative;
+  z-index: 2;
+}
+
+body.ruleta3 .confetti-root,
+body.ruleta5 .confetti-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.ruleta3 .confetti-piece,
+body.ruleta5 .confetti-piece {
+  position: absolute;
+  top: -24px;
+  width: 8px;
+  height: 12px;
+  will-change: transform, opacity;
+  animation-name: wheelConfettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes wheelConfettiFall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(var(--rot, 360deg));
+    opacity: 0.92;
+  }
+}
+
 /* Confeti solo en premio físico (app4.js); detrás del contenido principal. */
 body.ruleta4 .app {
   position: relative;
@@ -565,6 +651,99 @@ body.ruleta4 .confetti-piece {
 }
 
 @keyframes ruleta4ConfettiFall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(var(--rot, 360deg));
+    opacity: 0.92;
+  }
+}
+
+/*
+  Ruleta Arauco: fondo blanco, tipografía negra, toque rojo muy suave.
+  Botón rojo (spin-btn--red). Puntero amarillo como ruletas 2/3/5 sobre fondo claro.
+*/
+body.ruleta-arauco {
+  color: #1a1a1a;
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(ellipse 120% 70% at 50% -8%, rgba(227, 29, 27, 0.07) 0%, transparent 52%),
+    linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+}
+
+body.ruleta-arauco .subtitle {
+  color: #444444;
+}
+
+body.ruleta-arauco .result {
+  color: #555555;
+}
+
+body.ruleta-arauco .result--prize {
+  color: #1a1a1a;
+}
+
+body.ruleta-arauco .result--siga {
+  color: #333333;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  text-align: center;
+}
+
+body.ruleta-arauco .spin-btn:focus-visible {
+  outline: 3px solid #1a1a1a;
+  outline-offset: 4px;
+}
+
+body.ruleta-arauco .prize-announce__message {
+  display: block;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
+  font-size: clamp(1.05rem, 3.8vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  letter-spacing: 0.02em;
+  font-variant-emoji: emoji;
+  word-break: break-word;
+}
+
+body.ruleta-arauco .prize-announce__message--win {
+  color: #1a1a1a;
+  text-shadow: 0 2px 14px rgba(214, 16, 22, 0.22);
+}
+
+body.ruleta-arauco .prize-announce__message--siga {
+  color: #333333;
+}
+
+body.ruleta-arauco .app {
+  position: relative;
+  z-index: 2;
+}
+
+body.ruleta-arauco .confetti-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.ruleta-arauco .confetti-piece {
+  position: absolute;
+  top: -24px;
+  width: 8px;
+  height: 12px;
+  will-change: transform, opacity;
+  animation-name: ruleta-arauco-ConfettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes ruleta-arauco-ConfettiFall {
   0% {
     transform: translateY(0) translateX(0) rotate(0deg);
     opacity: 1;
@@ -607,7 +786,10 @@ body.ruleta4 .confetti-piece {
     animation: none;
   }
 
-  body.ruleta4 .confetti-piece {
+  body.ruleta3 .confetti-piece,
+  body.ruleta4 .confetti-piece,
+  body.ruleta5 .confetti-piece,
+  body.ruleta-arauco .confetti-piece {
     animation: none !important;
     opacity: 0 !important;
     visibility: hidden !important;

@@ -1,27 +1,23 @@
 /**
- * Ruleta Guacamole — 8 casilleros CW desde el puntero (guacamole.svg).
- * Mantener alineado con RULETA4_SEGMENT_OUTCOMES en server/lib/ruleta4SpinService.js.
- *
- * Orden: stickers, Siga participando, botella, pelota, llavero, Siga participando, morral, lonchera.
+ * Ruleta Bellavista — misma geometría que chicureo.svg.
+ * Mantener alineado con BELLAVISTA_SEGMENT_PRIZES en server/lib/bellavistaSpinService.js.
  */
-const WHEEL_SVG_URL = '/assets/guacamole.svg'
+const WHEEL_SVG_URL = '/assets/chicureo.svg'
 
+const SEGMENT_COUNT = 8
 const POINTER_ANGLE_DEG = 270
-const SEGMENT_STEP_DEG = 360 / 8
+const SEGMENT_STEP_DEG = 360 / SEGMENT_COUNT
 
-const SEGMENT_ORDER_CLOCKWISE = [
-  'stickers',
-  'siga_participando',
-  'botella',
-  'pelota_corazon',
-  'llavero',
-  'siga_participando',
-  'morral',
-  'lonchera'
-]
+const SEGMENT_ORDER_CLOCKWISE = ['lanyard', 'parasol', 'libreta', 'lanyard', 'parasol', 'libreta', 'lanyard', 'parasol']
 
-const STORAGE_ANON = 'ruleta4_guacamole_anon_id'
+const STORAGE_ANON = 'ruleta5_bellavista_anon_id'
 const POLL_MS = 5000
+
+const PRIZE_ANNOUNCE_BOTTOM = {
+  libreta: 'UNA LIBRETA',
+  parasol: 'UN PARASOL',
+  lanyard: 'UN LANYARD'
+}
 
 function normalizeAngle(angle) {
   const a = angle % 360
@@ -69,7 +65,7 @@ let wheelReady = false
 const PRIZE_ANNOUNCE_MS = 2500
 const PRIZE_EXIT_MS = 700
 
-const CONFETTI_COLORS = ['#62d655', '#fab918', '#ff6b9d', '#4db143', '#ffffff', '#7dd3fc', '#fda4af', '#fde047']
+const CONFETTI_COLORS = ['#fab918', '#ff4d50', '#ffffff', '#d61016', '#ff6b9d', '#fde047', '#fda4af', '#7dd3fc']
 
 let confettiCleanupTimer = null
 
@@ -82,7 +78,7 @@ function clearConfettiLayer() {
   if (root) root.replaceChildren()
 }
 
-function launchRuleta4Confetti() {
+function launchConfetti() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
   const root = document.getElementById('confettiRoot')
@@ -96,7 +92,6 @@ function launchRuleta4Confetti() {
   for (let i = 0; i < count; i += 1) {
     const el = document.createElement('span')
     el.className = 'confetti-piece'
-    // Pantalla completa: cubre todo el ancho del fondo (porcentaje sobre el root fijo inset:0).
     el.style.left = `${Math.random() * 100}%`
     el.style.backgroundColor = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]
 
@@ -179,7 +174,7 @@ function mountWheelSvg() {
 
       svg.setAttribute('class', 'wheel-img wheel-svg-inline')
       svg.setAttribute('role', 'img')
-      svg.setAttribute('aria-label', 'Ruleta Guacamole')
+      svg.setAttribute('aria-label', 'Ruleta Bellavista')
       svg.setAttribute('focusable', 'false')
       svg.setAttribute('shape-rendering', 'geometricPrecision')
       svg.setAttribute('text-rendering', 'geometricPrecision')
@@ -189,10 +184,10 @@ function mountWheelSvg() {
       wheelEl.classList.remove('wheel-spin--loading')
     })
     .catch(err => {
-      console.error('No se pudo incrustar el SVG Guacamole:', err?.message || err)
+      console.error('No se pudo incrustar el SVG Bellavista:', err?.message || err)
       const img = document.createElement('img')
       img.className = 'wheel-img wheel-img--fallback'
-      img.alt = 'Ruleta Guacamole'
+      img.alt = 'Ruleta Bellavista'
       img.src = WHEEL_SVG_URL
       img.decoding = 'async'
       img.fetchPriority = 'high'
@@ -265,7 +260,7 @@ function isResultMessageLocked() {
 
 function clearPrizeAnnouncementClasses() {
   if (!resultMsg) return
-  resultMsg.classList.remove('result--prize', 'result--prize--enter', 'result--prize--exit', 'result--siga')
+  resultMsg.classList.remove('result--prize', 'result--prize--enter', 'result--prize--exit')
 }
 
 function clearPrizeAnnouncement() {
@@ -278,28 +273,7 @@ function clearPrizeAnnouncement() {
   }
 }
 
-/** Añade cierre con exclamación si el texto aún no termina en ! ¡ ? */
-function withClosingExclamation(phrase) {
-  const t = String(phrase || '').trim()
-  if (!t) return '¡Genial!'
-  if (/[!¡?]$/.test(t)) return t
-  return `${t}!`
-}
-
-/** Premio físico: iconos de celebración + exclamación (el texto viene del servidor). */
-function formatCelebrationWin(labelFromServer) {
-  const core = withClosingExclamation(labelFromServer || 'Te ganaste')
-  return `🎉 ${core} ✨`
-}
-
-/** Siga participando: ✨ (elegante, sin parecer premio). */
-function formatSigaCelebration(labelFromServer) {
-  const core = withClosingExclamation(labelFromServer || 'Siga participando')
-  return `✨ ${core} ✨`
-}
-
-/** Tras la animación de la ruleta: muestra el mensaje y en el mismo instante el confeti. */
-function showPhysicalPrizeAnnouncement(labelFromServer) {
+function showPrizeAnnouncement(prizeKey, labelFromServer) {
   if (!resultMsg) return
   if (prizeAnnouncementTimer) {
     window.clearTimeout(prizeAnnouncementTimer)
@@ -310,48 +284,20 @@ function showPhysicalPrizeAnnouncement(labelFromServer) {
     prizeExitTimer = null
   }
 
-  const line = document.createElement('span')
-  line.className = 'prize-announce__message prize-announce__message--win'
-  line.textContent = formatCelebrationWin(labelFromServer)
+  const bottom =
+    PRIZE_ANNOUNCE_BOTTOM[prizeKey] ||
+    (labelFromServer ? String(labelFromServer).toUpperCase() : String(prizeKey).toUpperCase())
 
-  resultMsg.replaceChildren(line)
+  resultMsg.innerHTML = `
+    <span class="prize-announce__top">¡TE GANASTE!</span><br/>
+    <span class="prize-announce__bottom">${bottom}</span>
+  `
   lastPrizeAnnouncementAt = Date.now()
-  resultMsg.classList.remove('result--siga', 'result--prize--enter')
+  resultMsg.classList.remove('result--prize--enter')
   void resultMsg.offsetHeight
   resultMsg.classList.add('result--prize', 'result--prize--enter')
 
-  launchRuleta4Confetti()
-
-  prizeAnnouncementTimer = window.setTimeout(() => {
-    resultMsg.classList.remove('result--prize--enter')
-    resultMsg.classList.add('result--prize--exit')
-    prizeExitTimer = window.setTimeout(() => {
-      clearPrizeAnnouncement()
-      spinBtn.disabled = false
-    }, PRIZE_EXIT_MS)
-  }, PRIZE_ANNOUNCE_MS)
-}
-
-function showSigaAnnouncement(labelFromServer) {
-  if (!resultMsg) return
-  if (prizeAnnouncementTimer) {
-    window.clearTimeout(prizeAnnouncementTimer)
-    prizeAnnouncementTimer = null
-  }
-  if (prizeExitTimer) {
-    window.clearTimeout(prizeExitTimer)
-    prizeExitTimer = null
-  }
-
-  const line = document.createElement('span')
-  line.className = 'prize-announce__message prize-announce__message--siga'
-  line.textContent = formatSigaCelebration(labelFromServer)
-
-  resultMsg.replaceChildren(line)
-  lastPrizeAnnouncementAt = Date.now()
-  resultMsg.classList.remove('result--prize', 'result--prize--enter')
-  void resultMsg.offsetHeight
-  resultMsg.classList.add('result--siga', 'result--prize--enter')
+  launchConfetti()
 
   prizeAnnouncementTimer = window.setTimeout(() => {
     resultMsg.classList.remove('result--prize--enter')
@@ -405,7 +351,7 @@ async function fetchStatus() {
   if (anonId) q.set('anonId', anonId)
   if (fpId) q.set('fpId', fpId)
 
-  const res = await fetch(`/api/ruleta4/status?${q.toString()}`)
+  const res = await fetch(`/api/bellavista/status?${q.toString()}`)
   return res.json()
 }
 
@@ -416,7 +362,7 @@ function applyStatusToUi(st) {
   }
 
   if (st.code === 'not_configured') {
-    statusLine.textContent = 'Ruleta Guacamole no está configurada en el servidor.'
+    statusLine.textContent = 'Bellavista no está configurado en el servidor.'
     spinBtn.disabled = true
     resultMsg.textContent = ''
     clearPrizeAnnouncement()
@@ -426,12 +372,12 @@ function applyStatusToUi(st) {
   if (st.code === 'inactive_campaign') {
     statusLine.textContent =
       st.reason === 'before_campaign'
-        ? 'Las activaciones aún no comienzan.'
+        ? 'Las activaciones Bellavista aún no comienzan.'
         : st.reason === 'after_campaign'
-          ? 'Las activaciones finalizaron.'
+          ? 'Las activaciones Bellavista finalizaron.'
           : st.reason === 'not_activation_day'
-            ? 'Hoy no hay activación.'
-            : 'Campaña no disponible.'
+            ? 'Hoy no hay activación Bellavista.'
+            : 'Campaña Bellavista no disponible.'
     spinBtn.disabled = true
     resultMsg.textContent = ''
     clearPrizeAnnouncement()
@@ -446,11 +392,22 @@ function applyStatusToUi(st) {
 
   statusLine.textContent = formatTodayCountdown(st)
 
+  const soldOut = st.soldOutAll
   const outside = !st.window.active
   const played = st.participantStatus?.alreadyPlayed
-  const canSpin = st.participantStatus?.canSpin
 
   if (isResultMessageLocked()) {
+    return
+  }
+
+  if (soldOut) {
+    if (Date.now() - lastPrizeAnnouncementAt <= PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 200) {
+      spinBtn.disabled = true
+      return
+    }
+    resultMsg.textContent = 'Premios agotados por hoy'
+    spinBtn.disabled = true
+    clearPrizeAnnouncementClasses()
     return
   }
 
@@ -467,13 +424,6 @@ function applyStatusToUi(st) {
       resultMsg.textContent = 'Ya participaste hoy.'
       clearPrizeAnnouncementClasses()
     }
-    return
-  }
-
-  if (canSpin === false) {
-    spinBtn.disabled = true
-    resultMsg.textContent = 'No podés girar en este momento.'
-    clearPrizeAnnouncementClasses()
     return
   }
 
@@ -494,7 +444,7 @@ async function poll() {
 async function postSpin(idempotencyKey) {
   const anonId = getOrCreateAnonId()
   const fpId = anonId ? '' : softFingerprint()
-  const res = await fetch('/api/ruleta4/spin', {
+  const res = await fetch('/api/bellavista/spin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ anonId, fpId, idempotencyKey })
@@ -516,7 +466,6 @@ spinBtn.addEventListener('click', async () => {
   spinBtn.disabled = true
   lockResultMessageUntil = Date.now() + 15000
   clearPrizeAnnouncement()
-  clearConfettiLayer()
   resultMsg.textContent = 'Girando…'
 
   const { ok, status, data } = await postSpin(idem)
@@ -553,21 +502,11 @@ spinBtn.addEventListener('click', async () => {
     return
   }
 
-  if (data.code === 'ok' && data.prize === 'siga_participando') {
-    pendingIdempotencyKey = null
-    resultMsg.textContent = ''
-    await animateToPrize('siga_participando', data.segmentIndex)
-    showSigaAnnouncement(data.label)
-    lockResultMessageUntil = Date.now() + PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 800
-    window.setTimeout(() => poll(), PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 120)
-    return
-  }
-
   if (data.code === 'ok' && data.prize) {
     pendingIdempotencyKey = null
     resultMsg.textContent = ''
     await animateToPrize(data.prize, data.segmentIndex)
-    showPhysicalPrizeAnnouncement(data.label)
+    showPrizeAnnouncement(data.prize, data.label)
     lockResultMessageUntil = Date.now() + PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 800
     window.setTimeout(() => poll(), PRIZE_ANNOUNCE_MS + PRIZE_EXIT_MS + 120)
     return

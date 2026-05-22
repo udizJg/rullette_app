@@ -1,26 +1,24 @@
 /**
- * Ruleta Guacamole — 8 casilleros CW desde el puntero (guacamole.svg).
- * Mantener alineado con RULETA4_SEGMENT_OUTCOMES en server/lib/ruleta4SpinService.js.
- *
- * Orden: stickers, Siga participando, botella, pelota, llavero, Siga participando, morral, lonchera.
+ * Ruleta Arauco — 8 casilleros CW desde el puntero (arauco.svg).
+ * Mantener alineado con ARAUCO_SEGMENT_OUTCOMES en server/lib/araucoSpinService.js.
  */
-const WHEEL_SVG_URL = '/assets/guacamole.svg'
+const WHEEL_SVG_URL = '/assets/arauco.svg'
 
 const POINTER_ANGLE_DEG = 270
 const SEGMENT_STEP_DEG = 360 / 8
 
 const SEGMENT_ORDER_CLOCKWISE = [
-  'stickers',
+  'totebag',
   'siga_participando',
-  'botella',
-  'pelota_corazon',
+  'llavero',
+  'pelota',
   'llavero',
   'siga_participando',
   'morral',
   'lonchera'
 ]
 
-const STORAGE_ANON = 'ruleta4_guacamole_anon_id'
+const STORAGE_ANON = 'ruleta_arauco_anon_id'
 const POLL_MS = 5000
 
 function normalizeAngle(angle) {
@@ -82,7 +80,7 @@ function clearConfettiLayer() {
   if (root) root.replaceChildren()
 }
 
-function launchRuleta4Confetti() {
+function launchAraucoConfetti() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
   const root = document.getElementById('confettiRoot')
@@ -179,7 +177,7 @@ function mountWheelSvg() {
 
       svg.setAttribute('class', 'wheel-img wheel-svg-inline')
       svg.setAttribute('role', 'img')
-      svg.setAttribute('aria-label', 'Ruleta Guacamole')
+      svg.setAttribute('aria-label', 'Ruleta Arauco')
       svg.setAttribute('focusable', 'false')
       svg.setAttribute('shape-rendering', 'geometricPrecision')
       svg.setAttribute('text-rendering', 'geometricPrecision')
@@ -189,10 +187,10 @@ function mountWheelSvg() {
       wheelEl.classList.remove('wheel-spin--loading')
     })
     .catch(err => {
-      console.error('No se pudo incrustar el SVG Guacamole:', err?.message || err)
+      console.error('No se pudo incrustar el SVG Arauco:', err?.message || err)
       const img = document.createElement('img')
       img.className = 'wheel-img wheel-img--fallback'
-      img.alt = 'Ruleta Guacamole'
+      img.alt = 'Ruleta Arauco'
       img.src = WHEEL_SVG_URL
       img.decoding = 'async'
       img.fetchPriority = 'high'
@@ -320,7 +318,7 @@ function showPhysicalPrizeAnnouncement(labelFromServer) {
   void resultMsg.offsetHeight
   resultMsg.classList.add('result--prize', 'result--prize--enter')
 
-  launchRuleta4Confetti()
+  launchAraucoConfetti()
 
   prizeAnnouncementTimer = window.setTimeout(() => {
     resultMsg.classList.remove('result--prize--enter')
@@ -405,7 +403,7 @@ async function fetchStatus() {
   if (anonId) q.set('anonId', anonId)
   if (fpId) q.set('fpId', fpId)
 
-  const res = await fetch(`/api/ruleta4/status?${q.toString()}`)
+  const res = await fetch(`/api/arauco/status?${q.toString()}`)
   return res.json()
 }
 
@@ -416,7 +414,7 @@ function applyStatusToUi(st) {
   }
 
   if (st.code === 'not_configured') {
-    statusLine.textContent = 'Ruleta Guacamole no está configurada en el servidor.'
+    statusLine.textContent = 'Ruleta Arauco no está configurada en el servidor.'
     spinBtn.disabled = true
     resultMsg.textContent = ''
     clearPrizeAnnouncement()
@@ -494,7 +492,7 @@ async function poll() {
 async function postSpin(idempotencyKey) {
   const anonId = getOrCreateAnonId()
   const fpId = anonId ? '' : softFingerprint()
-  const res = await fetch('/api/ruleta4/spin', {
+  const res = await fetch('/api/arauco/spin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ anonId, fpId, idempotencyKey })

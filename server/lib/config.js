@@ -142,7 +142,9 @@ export function loadConfig() {
   const tz = process.env.TZ || 'America/Santiago'
   const scheduleRaw = (process.env.CAMPAIGN_SCHEDULE || '').trim()
   const chicureoScheduleRaw = (process.env.CHICUREO_SCHEDULE || '').trim()
+  const bellavistaScheduleRaw = (process.env.BELLAVISTA_SCHEDULE || '').trim()
   const ruleta4ScheduleRaw = (process.env.RULETA4_SCHEDULE || '').trim()
+  const araucoScheduleRaw = (process.env.ARAUCO_SCHEDULE || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -166,6 +168,18 @@ export function loadConfig() {
       }
     : null
 
+  const bellavistaDefaultLimits = {
+    libreta: envInt('BELLAVISTA_PRIZE_LIBRETA', 3),
+    parasol: envInt('BELLAVISTA_PRIZE_PARASOL', 20),
+    lanyard: envInt('BELLAVISTA_PRIZE_LANYARD', 99)
+  }
+  const bellavista = bellavistaScheduleRaw
+    ? {
+        schedule: parseChicureoSchedule(bellavistaScheduleRaw),
+        defaultLimits: bellavistaDefaultLimits
+      }
+    : null
+
   const ruleta4DefaultLimits = {
     stickers: envInt('RULETA4_PRIZE_STICKERS', 24),
     botella: envInt('RULETA4_PRIZE_BOTELLA', 2),
@@ -178,6 +192,20 @@ export function loadConfig() {
     ? {
         schedule: parseChicureoSchedule(ruleta4ScheduleRaw),
         defaultLimits: ruleta4DefaultLimits
+      }
+    : null
+
+  const araucoDefaultLimits = {
+    pelota: envInt('ARAUCO_PRIZE_PELOTA', 100),
+    llavero: envInt('ARAUCO_PRIZE_LLAVERO', 100),
+    morral: envInt('ARAUCO_PRIZE_MORRAL', 50),
+    lonchera: envInt('ARAUCO_PRIZE_LONCHERA', 20),
+    totebag: envInt('ARAUCO_PRIZE_TOTEBAG', 4)
+  }
+  const arauco = araucoScheduleRaw
+    ? {
+        schedule: parseChicureoSchedule(araucoScheduleRaw),
+        defaultLimits: araucoDefaultLimits
       }
     : null
 
@@ -210,7 +238,9 @@ export function loadConfig() {
       wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
       prizeKeys: PRIZE_KEYS,
       chicureo,
-      ruleta4
+      bellavista,
+      ruleta4,
+      arauco
     }
   }
 
@@ -242,6 +272,8 @@ export function loadConfig() {
     wheelSvgPath: process.env.WHEEL_SVG_PATH || '',
     prizeKeys: PRIZE_KEYS,
     chicureo,
-    ruleta4
+    bellavista,
+    ruleta4,
+    arauco
   }
 }

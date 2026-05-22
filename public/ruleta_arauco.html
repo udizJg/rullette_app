@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Ruleta Chicureo</title>
+    <title>Ruleta Arauco</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Montserrat:wght@700;800;900&display=swap"
       rel="stylesheet" />
-    <link rel="preload" href="/assets/chicureo.svg" as="fetch" type="image/svg+xml" crossorigin="anonymous" />
+    <link rel="preload" href="/assets/arauco.svg" as="fetch" type="image/svg+xml" crossorigin="anonymous" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="ruleta3">
+  <body class="ruleta-arauco">
     <div class="confetti-root" id="confettiRoot" aria-hidden="true"></div>
     <main class="app">
       <header class="header">
@@ -24,7 +24,7 @@
           <div class="pointer" aria-hidden="true"></div>
           <div class="wheel-rim">
             <div class="wheel-spin wheel-spin--loading" id="wheelSpin" aria-busy="true">
-              <!-- SVG incrustado por app3.js -->
+              <!-- SVG incrustado por app_arauco.js -->
             </div>
           </div>
           <div class="pointer-cover" aria-hidden="true"></div>
@@ -38,6 +38,6 @@
         <p class="result" id="resultMsg"></p>
       </section>
     </main>
-    <script src="/app3.js" type="module"></script>
+    <script src="/app_arauco.js" type="module"></script>
   </body>
 </html>

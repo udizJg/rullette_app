@@ -9,7 +9,13 @@ import { createStore } from './lib/store.js'
 import { PRIZE_LABELS, availablePrizeKeys } from './lib/prizes.js'
 import { applySpinMutation, participantKeyFromBody } from './lib/spinService.js'
 import { applyChicureoSpinMutation, CHICUREO_PRIZE_LABELS, CHICUREO_PRIZE_KEYS } from './lib/chicureoSpinService.js'
+import {
+  applyBellavistaSpinMutation,
+  BELLAVISTA_PRIZE_LABELS,
+  BELLAVISTA_PRIZE_KEYS
+} from './lib/bellavistaSpinService.js'
 import { applyRuleta4SpinMutation, RULETA4_PRIZE_KEYS, RULETA4_RESULT_LABELS } from './lib/ruleta4SpinService.js'
+import { applyAraucoSpinMutation, ARAUCO_PRIZE_KEYS, ARAUCO_RESULT_LABELS } from './lib/araucoSpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -160,6 +166,22 @@ function cleanupChicureoDevLogs(dayKey) {
   }
 }
 
+function cleanupBellavistaDevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('bellavista-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `bellavista-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs Bellavista de dev:', err?.message || err)
+  }
+}
+
 function cleanupRuleta4DevLogs(dayKey) {
   if (!isDevelopment) return
   try {
@@ -173,6 +195,22 @@ function cleanupRuleta4DevLogs(dayKey) {
     }
   } catch (err) {
     console.error('No se pudo limpiar logs ruleta 4 de dev:', err?.message || err)
+  }
+}
+
+function cleanupAraucoDevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('arauco-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `arauco-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs Arauco de dev:', err?.message || err)
   }
 }
 
@@ -194,6 +232,24 @@ function writeChicureoSpinLog(dayKey, entry) {
   }
 }
 
+function writeBellavistaSpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupBellavistaDevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `bellavista-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[BELLAVISTA][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log Bellavista:', err?.message || err)
+  }
+}
+
 function writeRuleta4SpinLog(dayKey, entry) {
   try {
     fs.mkdirSync(logsDir, { recursive: true })
@@ -209,6 +265,24 @@ function writeRuleta4SpinLog(dayKey, entry) {
     console.log(`[RULETA4][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
   } catch (err) {
     console.error('No se pudo escribir log ruleta 4:', err?.message || err)
+  }
+}
+
+function writeAraucoSpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupAraucoDevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `arauco-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[ARAUCO][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log Arauco:', err?.message || err)
   }
 }
 
@@ -345,6 +419,46 @@ function getChicureoDaySnapshot(dayKey) {
   return { inventory: { ...d.inventory }, spins: { ...d.spins } }
 }
 
+function bellavistaNowContext() {
+  if (!config.bellavista) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.bellavista.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getBellavistaDaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.bellavista?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.bellavista.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
 function ruleta4NowContext() {
   if (!config.ruleta4) {
     return {
@@ -389,6 +503,70 @@ function ruleta4SoldOutAll(inventory) {
   return !RULETA4_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
 }
 
+function araucoNowContext() {
+  if (!config.arauco) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.arauco.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getAraucoDaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.arauco?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.arauco.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
+function araucoSoldOutAll(inventory) {
+  return !ARAUCO_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+function buildAraucoDayStats(inventory, defaultLimits) {
+  const delivered = {}
+  const perPrize = {}
+  let totalPhysicalSpins = 0
+  for (const k of ARAUCO_PRIZE_KEYS) {
+    const initial = defaultLimits[k] ?? 0
+    const remaining = inventory[k] ?? 0
+    const n = Math.max(0, initial - remaining)
+    delivered[k] = n
+    totalPhysicalSpins += n
+    perPrize[k] = { initial, delivered: n, remaining }
+  }
+  return {
+    dailyInitial: { ...defaultLimits },
+    delivered,
+    perPrize,
+    totalPhysicalSpins
+  }
+}
+
 /** Estadísticas del día solo para premios físicos (sin «Siga participando»). */
 function buildRuleta4DayStats(inventory, defaultLimits) {
   const delivered = {}
@@ -411,10 +589,10 @@ function buildRuleta4DayStats(inventory, defaultLimits) {
 }
 
 /** Premios entregados hoy = cupo diario − remaining (cada ok baja 1 unidad). */
-function buildChicureoDayStats(inventory, defaultLimits) {
+function buildScheduleDayStats(inventory, defaultLimits, prizeKeys) {
   const delivered = {}
   let totalSpins = 0
-  for (const k of CHICUREO_PRIZE_KEYS) {
+  for (const k of prizeKeys) {
     const cap = defaultLimits[k] ?? 0
     const left = inventory[k] ?? 0
     const n = Math.max(0, cap - left)
@@ -426,6 +604,14 @@ function buildChicureoDayStats(inventory, defaultLimits) {
     delivered,
     totalSpins
   }
+}
+
+function buildChicureoDayStats(inventory, defaultLimits) {
+  return buildScheduleDayStats(inventory, defaultLimits, CHICUREO_PRIZE_KEYS)
+}
+
+function buildBellavistaDayStats(inventory, defaultLimits) {
+  return buildScheduleDayStats(inventory, defaultLimits, BELLAVISTA_PRIZE_KEYS)
 }
 
 app.get('/api/status', (req, res) => {
@@ -607,7 +793,11 @@ app.post('/api/spin', (req, res) => {
 })
 
 function chicureoSoldOutAll(inventory) {
-  return !['libreta', 'parasol', 'lanyard'].some(k => (inventory?.[k] ?? 0) > 0)
+  return !CHICUREO_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+function bellavistaSoldOutAll(inventory) {
+  return !BELLAVISTA_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
 }
 
 app.get('/api/chicureo/status', (req, res) => {
@@ -727,6 +917,139 @@ app.post('/api/chicureo/spin', (req, res) => {
         at: new Date().toISOString(),
         mode: config.nodeEnv,
         endpoint: '/api/chicureo/spin',
+        code: result.payload?.code || 'unknown',
+        prize,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
+app.get('/api/bellavista/status', (req, res) => {
+  if (!config.bellavista) {
+    return res.json({
+      code: 'not_configured',
+      message: 'Bellavista no está configurado (BELLAVISTA_SCHEDULE).'
+    })
+  }
+
+  const ctx = bellavistaNowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.bellavista.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getBellavistaDaySnapshot(dayKey)
+  const soldOutAll = bellavistaSoldOutAll(snap.inventory)
+  const defaultBv = config.bellavista.defaultLimits
+  const stats = buildBellavistaDayStats(snap.inventory, defaultBv)
+  const enforceOnePerParticipant = false
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    const pk = participantKeyFromBody(anonId, fpId)
+    const played = enforceOnePerParticipant ? Boolean(snap.spins[pk]) : false
+    participantStatus = {
+      canSpin: effectiveWin.active && !soldOutAll && !played,
+      alreadyPlayed: played
+    }
+  }
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.bellavista.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    stats,
+    labels: BELLAVISTA_PRIZE_LABELS,
+    soldOutAll,
+    participantStatus
+  })
+})
+
+app.post('/api/bellavista/spin', (req, res) => {
+  if (!config.bellavista) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'Bellavista no está configurado.'
+    })
+  }
+
+  const ctx = bellavistaNowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  store
+    .runMutation(state => {
+      const prevDay = state.bellavista?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.bellavista.defaultLimits }
+      const result = applyBellavistaSpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.bellavista.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const prize = result.payload?.prize ?? null
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prize)
+      writeBellavistaSpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/bellavista/spin',
         code: result.payload?.code || 'unknown',
         prize,
         segmentIndex: result.payload?.segmentIndex,
@@ -887,6 +1210,147 @@ app.post('/api/ruleta4/spin', (req, res) => {
     })
 })
 
+app.get('/api/arauco/status', (req, res) => {
+  if (!config.arauco) {
+    return res.json({
+      code: 'not_configured',
+      message: 'Ruleta Arauco no está configurada (ARAUCO_SCHEDULE).'
+    })
+  }
+
+  const ctx = araucoNowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.arauco.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getAraucoDaySnapshot(dayKey)
+  const soldOutPhysical = araucoSoldOutAll(snap.inventory)
+  const defaultAr = config.arauco.defaultLimits
+  const stats = buildAraucoDayStats(snap.inventory, defaultAr)
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    participantStatus = {
+      canSpin: effectiveWin.active,
+      alreadyPlayed: false,
+      soldOutPhysical
+    }
+  }
+
+  const physicalPrizes = ARAUCO_PRIZE_KEYS.map(key => ({
+    key,
+    label: ARAUCO_RESULT_LABELS[key] || key,
+    initialForDay: stats.perPrize[key].initial,
+    delivered: stats.perPrize[key].delivered,
+    remaining: stats.perPrize[key].remaining
+  }))
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.arauco.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    stats,
+    physicalPrizes,
+    labels: ARAUCO_RESULT_LABELS,
+    soldOutPhysical,
+    participantStatus
+  })
+})
+
+app.post('/api/arauco/spin', (req, res) => {
+  if (!config.arauco) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'Ruleta Arauco no está configurada.'
+    })
+  }
+
+  const ctx = araucoNowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  store
+    .runMutation(state => {
+      const prevDay = state.arauco?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.arauco.defaultLimits }
+      const result = applyAraucoSpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.arauco.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const rawPrize = result.payload?.prize
+      const prizeForDelta = rawPrize === 'siga_participando' ? null : (rawPrize ?? null)
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prizeForDelta)
+      writeAraucoSpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/arauco/spin',
+        code: result.payload?.code || 'unknown',
+        prize: rawPrize ?? null,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
 // Orden CW desde el puntero (ruleta2 + mcdonald.svg). Alinear con app2.js.
 const SPIN2_SEGMENT_PRIZES = [
   'PREMIO SORPRESA',
@@ -938,6 +1402,15 @@ app.listen(config.port, () => {
         `por día: libreta=${lim.libreta} parasol=${lim.parasol} lanyard=${lim.lanyard}`
     )
   }
+  if (config.bellavista) {
+    const first = config.bellavista.schedule[0]?.dayKey
+    const last = config.bellavista.schedule[config.bellavista.schedule.length - 1]?.dayKey
+    const lim = config.bellavista.defaultLimits
+    console.log(
+      `Bellavista: ${config.bellavista.schedule.length} día(s) (${first} → ${last}) · ` +
+        `por día: libreta=${lim.libreta} parasol=${lim.parasol} lanyard=${lim.lanyard}`
+    )
+  }
   if (config.ruleta4) {
     const first = config.ruleta4.schedule[0]?.dayKey
     const last = config.ruleta4.schedule[config.ruleta4.schedule.length - 1]?.dayKey
@@ -946,6 +1419,16 @@ app.listen(config.port, () => {
       `Ruleta 4 (Guacamole): ${config.ruleta4.schedule.length} día(s) (${first} → ${last}) · ` +
         `stock/día: stickers=${lim.stickers} botella=${lim.botella} pelota=${lim.pelota_corazon} ` +
         `llavero=${lim.llavero} morral=${lim.morral} lonchera=${lim.lonchera}`
+    )
+  }
+  if (config.arauco) {
+    const first = config.arauco.schedule[0]?.dayKey
+    const last = config.arauco.schedule[config.arauco.schedule.length - 1]?.dayKey
+    const lim = config.arauco.defaultLimits
+    console.log(
+      `Arauco: ${config.arauco.schedule.length} día(s) (${first} → ${last}) · ` +
+        `stock/día: pelota=${lim.pelota} llavero=${lim.llavero} morral=${lim.morral} ` +
+        `lonchera=${lim.lonchera} totebag=${lim.totebag} · 30% siga participando`
     )
   }
 })
