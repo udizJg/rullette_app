@@ -394,6 +394,59 @@ body.ruleta2 .result--prize {
   text-shadow: 0 2px 12px rgba(214, 16, 22, 0.2);
 }
 
+body.ruleta2 .result--siga {
+  color: #333333;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
+  font-weight: 700;
+  text-align: center;
+}
+
+body.ruleta2 .prize-announce__message {
+  display: block;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
+  font-size: clamp(1.05rem, 3.8vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  letter-spacing: 0.02em;
+  font-variant-emoji: emoji;
+  word-break: break-word;
+}
+
+body.ruleta2 .prize-announce__message--win {
+  color: #1a1a1a;
+  text-shadow: 0 2px 14px rgba(214, 16, 22, 0.22);
+}
+
+body.ruleta2 .prize-announce__message--siga {
+  color: #333333;
+}
+
+body.ruleta2 .app {
+  position: relative;
+  z-index: 2;
+}
+
+body.ruleta2 .confetti-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.ruleta2 .confetti-piece {
+  position: absolute;
+  top: -24px;
+  width: 8px;
+  height: 12px;
+  will-change: transform, opacity;
+  animation-name: wheelConfettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
 /*
   Ruleta 3: mismo dramatismo que ruleta 1 (fondo oscuro + halo superior),
   pero halo y degradé en rojo (McDonald’s / Chicureo) en vez de verde.
@@ -786,6 +839,7 @@ body.ruleta-arauco .confetti-piece {
     animation: none;
   }
 
+  body.ruleta2 .confetti-piece,
   body.ruleta3 .confetti-piece,
   body.ruleta4 .confetti-piece,
   body.ruleta5 .confetti-piece,

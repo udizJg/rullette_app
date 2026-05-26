@@ -104,9 +104,152 @@ function mountWheelSvg() {
 let wheelRotation = 0
 let prizeAnnouncementTimer = null
 let prizeExitTimer = null
+let confettiCleanupTimer = null
 
 const PRIZE_ANNOUNCE_MS = 2500
 const PRIZE_EXIT_MS = 700
+
+const CONFETTI_COLORS = ['#fab918', '#ff4d50', '#ffffff', '#d61016', '#ff6b9d', '#fde047', '#fda4af', '#7dd3fc']
+
+const PRIZE_WIN = 'PREMIO SORPRESA'
+
+function clearConfettiLayer() {
+  if (confettiCleanupTimer) {
+    window.clearTimeout(confettiCleanupTimer)
+    confettiCleanupTimer = null
+  }
+  const root = document.getElementById('confettiRoot')
+  if (root) root.replaceChildren()
+}
+
+function launchConfetti() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  const root = document.getElementById('confettiRoot')
+  if (!root) return
+
+  clearConfettiLayer()
+
+  const count = 78
+  const maxDurSec = 4.6
+
+  for (let i = 0; i < count; i += 1) {
+    const el = document.createElement('span')
+    el.className = 'confetti-piece'
+    el.style.left = `${Math.random() * 100}%`
+    el.style.backgroundColor = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]
+
+    const w = 5 + Math.random() * 10
+    const h = 7 + Math.random() * 16
+    el.style.width = `${w}px`
+    el.style.height = `${h}px`
+    el.style.borderRadius = Math.random() > 0.45 ? '2px' : `${3 + Math.random() * 5}px`
+
+    const dur = 2.2 + Math.random() * (maxDurSec - 2.2)
+    el.style.animationDuration = `${dur}s`
+    el.style.animationDelay = `${Math.random() * 0.4}s`
+
+    const drift = (Math.random() - 0.5) * 220
+    const rot = Math.random() * 900 - 450
+    el.style.setProperty('--drift', `${drift}px`)
+    el.style.setProperty('--rot', `${rot}deg`)
+    el.style.opacity = String(0.88 + Math.random() * 0.12)
+
+    root.appendChild(el)
+  }
+
+  confettiCleanupTimer = window.setTimeout(() => clearConfettiLayer(), Math.ceil(maxDurSec * 1000) + 800)
+}
+
+function withClosingExclamation(phrase) {
+  const t = String(phrase || '').trim()
+  if (!t) return '¡Genial!'
+  if (/[!¡?]$/.test(t)) return t
+  return `${t}!`
+}
+
+function formatCelebrationWin(label) {
+  const core = withClosingExclamation(label)
+  return `🎉 ${core} ✨`
+}
+
+function formatSigaCelebration(label) {
+  const core = withClosingExclamation(label)
+  return `✨ ${core} ✨`
+}
+
+function clearPrizeAnnouncementClasses() {
+  if (!resultMsg) return
+  resultMsg.classList.remove('result--prize', 'result--prize--enter', 'result--prize--exit', 'result--siga')
+}
+
+function clearPrizeAnnouncement() {
+  if (!resultMsg) return
+  clearPrizeAnnouncementClasses()
+  resultMsg.textContent = ''
+  if (prizeExitTimer) {
+    window.clearTimeout(prizeExitTimer)
+    prizeExitTimer = null
+  }
+}
+
+function schedulePrizeDismiss() {
+  prizeAnnouncementTimer = window.setTimeout(() => {
+    resultMsg.classList.remove('result--prize--enter')
+    resultMsg.classList.add('result--prize--exit')
+    prizeExitTimer = window.setTimeout(() => {
+      clearPrizeAnnouncement()
+      spinBtn.disabled = false
+    }, PRIZE_EXIT_MS)
+  }, PRIZE_ANNOUNCE_MS)
+}
+
+function showWinAnnouncement(prizeLabel) {
+  if (!resultMsg) return
+  if (prizeAnnouncementTimer) {
+    window.clearTimeout(prizeAnnouncementTimer)
+    prizeAnnouncementTimer = null
+  }
+  if (prizeExitTimer) {
+    window.clearTimeout(prizeExitTimer)
+    prizeExitTimer = null
+  }
+
+  const line = document.createElement('span')
+  line.className = 'prize-announce__message prize-announce__message--win'
+  line.textContent = formatCelebrationWin(prizeLabel)
+
+  resultMsg.replaceChildren(line)
+  resultMsg.classList.remove('result--siga', 'result--prize--enter')
+  void resultMsg.offsetHeight
+  resultMsg.classList.add('result--prize', 'result--prize--enter')
+
+  launchConfetti()
+  schedulePrizeDismiss()
+}
+
+function showNeutralAnnouncement(prizeLabel) {
+  if (!resultMsg) return
+  if (prizeAnnouncementTimer) {
+    window.clearTimeout(prizeAnnouncementTimer)
+    prizeAnnouncementTimer = null
+  }
+  if (prizeExitTimer) {
+    window.clearTimeout(prizeExitTimer)
+    prizeExitTimer = null
+  }
+
+  const line = document.createElement('span')
+  line.className = 'prize-announce__message prize-announce__message--siga'
+  line.textContent = formatSigaCelebration(prizeLabel)
+
+  resultMsg.replaceChildren(line)
+  resultMsg.classList.remove('result--prize', 'result--prize--enter')
+  void resultMsg.offsetHeight
+  resultMsg.classList.add('result--siga', 'result--prize--enter')
+
+  schedulePrizeDismiss()
+}
 
 function animateToPrize(prize, segmentIndex) {
   const segment = resolveSegment(prize, segmentIndex)
@@ -165,30 +308,11 @@ function animateToPrize(prize, segmentIndex) {
 }
 
 function showPrizeAnnouncement(prize) {
-  if (!resultMsg) return
-  if (prizeAnnouncementTimer) {
-    window.clearTimeout(prizeAnnouncementTimer)
-    prizeAnnouncementTimer = null
+  if (prize === PRIZE_WIN) {
+    showWinAnnouncement(prize)
+    return
   }
-  if (prizeExitTimer) {
-    window.clearTimeout(prizeExitTimer)
-    prizeExitTimer = null
-  }
-
-  resultMsg.innerHTML = `<span class="prize-announce__bottom">${prize}</span>`
-  resultMsg.classList.remove('result--prize--enter')
-  void resultMsg.offsetHeight
-  resultMsg.classList.add('result--prize', 'result--prize--enter')
-
-  prizeAnnouncementTimer = window.setTimeout(() => {
-    resultMsg.classList.remove('result--prize--enter')
-    resultMsg.classList.add('result--prize--exit')
-    prizeExitTimer = window.setTimeout(() => {
-      resultMsg.classList.remove('result--prize', 'result--prize--exit')
-      resultMsg.textContent = ''
-      spinBtn.disabled = false
-    }, PRIZE_EXIT_MS)
-  }, PRIZE_ANNOUNCE_MS)
+  showNeutralAnnouncement(prize)
 }
 
 if (spinBtn) {
@@ -196,7 +320,8 @@ if (spinBtn) {
   spinBtn.addEventListener('click', async () => {
     if (spinBtn.disabled) return
     spinBtn.disabled = true
-    resultMsg.classList.remove('result--prize', 'result--prize--enter', 'result--prize--exit')
+    clearPrizeAnnouncementClasses()
+    clearConfettiLayer()
     resultMsg.textContent = 'Girando…'
 
     let prize
