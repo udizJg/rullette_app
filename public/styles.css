@@ -89,6 +89,7 @@ body {
 .wheel-frame {
   position: relative;
   width: min(92vw, 440px);
+  aspect-ratio: 1;
   padding: clamp(10px, 2.5vw, 16px);
   border-radius: 50%;
   overflow: hidden;

@@ -189,6 +189,11 @@ function mountWheelSvg() {
       svg.setAttribute('focusable', 'false')
       svg.setAttribute('shape-rendering', 'geometricPrecision')
       svg.setAttribute('text-rendering', 'geometricPrecision')
+      if (!svg.getAttribute('viewBox')) {
+        svg.setAttribute('viewBox', '0 0 667 667')
+      }
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+      svg.querySelectorAll('[clip-path]').forEach(el => el.removeAttribute('clip-path'))
 
       wheelEl.replaceChildren(svg)
       wheelEl.setAttribute('aria-busy', 'false')
