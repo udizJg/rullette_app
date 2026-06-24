@@ -460,6 +460,16 @@ body.ruleta3 {
     linear-gradient(180deg, #1c1010 0%, #120a0a 100%);
 }
 
+/* Ruleta 6 (NIU locales): mismo tema oscuro rojo que Chicureo. */
+body.ruleta6 {
+  color: var(--text);
+  background-color: #120a0a;
+  background-image:
+    radial-gradient(ellipse 130% 90% at 50% -15%, rgba(214, 16, 22, 0.32) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(0, 0, 0, 0.35) 0%, transparent 45%),
+    linear-gradient(180deg, #1c1010 0%, #120a0a 100%);
+}
+
 /*
   Ruleta 5 (Bellavista): misma estructura de halos que Chicureo,
   paleta negro · blanco · rojo.
@@ -480,16 +490,23 @@ body.ruleta5 {
 }
 
 body.ruleta3 .subtitle,
-body.ruleta5 .subtitle {
+body.ruleta5 .subtitle,
+body.ruleta6 .subtitle {
   color: #c9bcb8;
 }
 
 body.ruleta3 .result,
-body.ruleta5 .result {
+body.ruleta5 .result,
+body.ruleta6 .result {
   color: #e0d8d6;
 }
 
 body.ruleta3 .result--prize {
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(214, 16, 22, 0.45);
+}
+
+body.ruleta6 .result--prize {
   color: #fff;
   text-shadow: 0 2px 14px rgba(214, 16, 22, 0.45);
 }
@@ -505,6 +522,7 @@ body.ruleta5 .result--prize {
 body.ruleta2 .pointer,
 body.ruleta3 .pointer,
 body.ruleta5 .pointer,
+body.ruleta6 .pointer,
 body.ruleta-arauco .pointer {
   clip-path: none;
   overflow: visible;
@@ -514,6 +532,7 @@ body.ruleta-arauco .pointer {
 body.ruleta2 .pointer::before,
 body.ruleta3 .pointer::before,
 body.ruleta5 .pointer::before,
+body.ruleta6 .pointer::before,
 body.ruleta-arauco .pointer::before {
   display: none;
 }
@@ -521,6 +540,7 @@ body.ruleta-arauco .pointer::before {
 body.ruleta2 .pointer::after,
 body.ruleta3 .pointer::after,
 body.ruleta5 .pointer::after,
+body.ruleta6 .pointer::after,
 body.ruleta-arauco .pointer::after {
   inset: 0;
   clip-path: none;
@@ -534,6 +554,7 @@ body.ruleta-arauco .pointer::after {
 body.ruleta2 .pointer-cover,
 body.ruleta3 .pointer-cover,
 body.ruleta5 .pointer-cover,
+body.ruleta6 .pointer-cover,
 body.ruleta-arauco .pointer-cover {
   clip-path: none;
   background-color: transparent;
@@ -550,6 +571,7 @@ body.ruleta-arauco .pointer-cover {
 body.ruleta2 .wheel-spin,
 body.ruleta3 .wheel-spin,
 body.ruleta5 .wheel-spin,
+body.ruleta6 .wheel-spin,
 body.ruleta-arauco .wheel-spin {
   will-change: auto;
   overflow: hidden;
@@ -562,6 +584,7 @@ body.ruleta-arauco .wheel-spin {
 body.ruleta2 .wheel-spin--loading,
 body.ruleta3 .wheel-spin--loading,
 body.ruleta5 .wheel-spin--loading,
+body.ruleta6 .wheel-spin--loading,
 body.ruleta-arauco .wheel-spin--loading {
   opacity: 0.94;
 }
@@ -569,6 +592,7 @@ body.ruleta-arauco .wheel-spin--loading {
 body.ruleta2 .wheel-spin.wheel-spin--animating,
 body.ruleta3 .wheel-spin.wheel-spin--animating,
 body.ruleta5 .wheel-spin.wheel-spin--animating,
+body.ruleta6 .wheel-spin.wheel-spin--animating,
 body.ruleta-arauco .wheel-spin.wheel-spin--animating {
   will-change: transform;
 }
@@ -577,11 +601,13 @@ body.ruleta2 .wheel-spin svg.wheel-svg-inline,
 body.ruleta3 .wheel-spin svg.wheel-svg-inline,
 body.ruleta4 .wheel-spin svg.wheel-svg-inline,
 body.ruleta5 .wheel-spin svg.wheel-svg-inline,
+body.ruleta6 .wheel-spin svg.wheel-svg-inline,
 body.ruleta-arauco .wheel-spin svg.wheel-svg-inline,
 body.ruleta2 .wheel-img,
 body.ruleta3 .wheel-img,
 body.ruleta4 .wheel-img,
 body.ruleta5 .wheel-img,
+body.ruleta6 .wheel-img,
 body.ruleta-arauco .wheel-img {
   display: block;
   width: 100%;
@@ -637,15 +663,17 @@ body.ruleta4 .prize-announce__message--siga {
   color: var(--text);
 }
 
-/* Confeti al mostrar premio (app3.js / app5.js), mismo patrón que ruleta 4. */
+/* Confeti al mostrar premio (app3.js / app5.js / app6.js), mismo patrón que ruleta 4. */
 body.ruleta3 .app,
-body.ruleta5 .app {
+body.ruleta5 .app,
+body.ruleta6 .app {
   position: relative;
   z-index: 2;
 }
 
 body.ruleta3 .confetti-root,
-body.ruleta5 .confetti-root {
+body.ruleta5 .confetti-root,
+body.ruleta6 .confetti-root {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -654,7 +682,8 @@ body.ruleta5 .confetti-root {
 }
 
 body.ruleta3 .confetti-piece,
-body.ruleta5 .confetti-piece {
+body.ruleta5 .confetti-piece,
+body.ruleta6 .confetti-piece {
   position: absolute;
   top: -24px;
   width: 8px;
@@ -843,6 +872,7 @@ body.ruleta-arauco .confetti-piece {
   body.ruleta3 .confetti-piece,
   body.ruleta4 .confetti-piece,
   body.ruleta5 .confetti-piece,
+  body.ruleta6 .confetti-piece,
   body.ruleta-arauco .confetti-piece {
     animation: none !important;
     opacity: 0 !important;

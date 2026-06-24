@@ -16,6 +16,7 @@ import {
 } from './lib/bellavistaSpinService.js'
 import { applyRuleta4SpinMutation, RULETA4_PRIZE_KEYS, RULETA4_RESULT_LABELS } from './lib/ruleta4SpinService.js'
 import { applyAraucoSpinMutation, ARAUCO_PRIZE_KEYS, ARAUCO_RESULT_LABELS } from './lib/araucoSpinService.js'
+import { applyNiuSpinMutation, NIU_PRIZE_LABELS, NIU_PRIZE_KEYS } from './lib/niuSpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -182,6 +183,22 @@ function cleanupBellavistaDevLogs(dayKey) {
   }
 }
 
+function cleanupNiuDevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('niu-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `niu-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs NIU de dev:', err?.message || err)
+  }
+}
+
 function cleanupRuleta4DevLogs(dayKey) {
   if (!isDevelopment) return
   try {
@@ -247,6 +264,24 @@ function writeBellavistaSpinLog(dayKey, entry) {
     console.log(`[BELLAVISTA][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
   } catch (err) {
     console.error('No se pudo escribir log Bellavista:', err?.message || err)
+  }
+}
+
+function writeNiuSpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupNiuDevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `niu-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[NIU][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log NIU:', err?.message || err)
   }
 }
 
@@ -459,6 +494,46 @@ function getBellavistaDaySnapshot(dayKey) {
   return { inventory: { ...d.inventory }, spins: { ...d.spins } }
 }
 
+function niuNowContext() {
+  if (!config.niu) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.niu.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getNiuDaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.niu?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.niu.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
 function ruleta4NowContext() {
   if (!config.ruleta4) {
     return {
@@ -612,6 +687,10 @@ function buildChicureoDayStats(inventory, defaultLimits) {
 
 function buildBellavistaDayStats(inventory, defaultLimits) {
   return buildScheduleDayStats(inventory, defaultLimits, BELLAVISTA_PRIZE_KEYS)
+}
+
+function buildNiuDayStats(inventory, defaultLimits) {
+  return buildScheduleDayStats(inventory, defaultLimits, NIU_PRIZE_KEYS)
 }
 
 app.get('/api/status', (req, res) => {
@@ -798,6 +877,10 @@ function chicureoSoldOutAll(inventory) {
 
 function bellavistaSoldOutAll(inventory) {
   return !BELLAVISTA_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+function niuSoldOutAll(inventory) {
+  return !NIU_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
 }
 
 app.get('/api/chicureo/status', (req, res) => {
@@ -1050,6 +1133,139 @@ app.post('/api/bellavista/spin', (req, res) => {
         at: new Date().toISOString(),
         mode: config.nodeEnv,
         endpoint: '/api/bellavista/spin',
+        code: result.payload?.code || 'unknown',
+        prize,
+        segmentIndex: result.payload?.segmentIndex,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
+app.get('/api/niu/status', (req, res) => {
+  if (!config.niu) {
+    return res.json({
+      code: 'not_configured',
+      message: 'NIU locales no está configurado (NIU_SCHEDULE).'
+    })
+  }
+
+  const ctx = niuNowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.niu.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getNiuDaySnapshot(dayKey)
+  const soldOutAll = niuSoldOutAll(snap.inventory)
+  const defaultNiu = config.niu.defaultLimits
+  const stats = buildNiuDayStats(snap.inventory, defaultNiu)
+  const enforceOnePerParticipant = false
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    const pk = participantKeyFromBody(anonId, fpId)
+    const played = enforceOnePerParticipant ? Boolean(snap.spins[pk]) : false
+    participantStatus = {
+      canSpin: effectiveWin.active && !soldOutAll && !played,
+      alreadyPlayed: played
+    }
+  }
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.niu.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    stats,
+    labels: NIU_PRIZE_LABELS,
+    soldOutAll,
+    participantStatus
+  })
+})
+
+app.post('/api/niu/spin', (req, res) => {
+  if (!config.niu) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'NIU locales no está configurado.'
+    })
+  }
+
+  const ctx = niuNowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  store
+    .runMutation(state => {
+      const prevDay = state.niu?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.niu.defaultLimits }
+      const result = applyNiuSpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.niu.defaultLimits,
+        enforceOnePerParticipant
+      })
+      const afterInventory = result.payload?.remaining ? { ...result.payload.remaining } : { ...beforeInventory }
+      const prize = result.payload?.prize ?? null
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prize)
+      writeNiuSpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/niu/spin',
         code: result.payload?.code || 'unknown',
         prize,
         segmentIndex: result.payload?.segmentIndex,
@@ -1429,6 +1645,16 @@ app.listen(config.port, () => {
       `Arauco: ${config.arauco.schedule.length} día(s) (${first} → ${last}) · ` +
         `stock/día: pelota=${lim.pelota} llavero=${lim.llavero} morral=${lim.morral} ` +
         `lonchera=${lim.lonchera} totebag=${lim.totebag} · 30% siga participando`
+    )
+  }
+  if (config.niu) {
+    const first = config.niu.schedule[0]?.dayKey
+    const last = config.niu.schedule[config.niu.schedule.length - 1]?.dayKey
+    const lim = config.niu.defaultLimits
+    console.log(
+      `NIU locales: ${config.niu.schedule.length} día(s) (${first} → ${last}) · ` +
+        `por día: pelota=${lim.pelota} lonchera=${lim.lonchera} botella=${lim.botella} ` +
+        `stickers=${lim.stickers} morral=${lim.morral}`
     )
   }
 })
