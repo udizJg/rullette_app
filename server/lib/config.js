@@ -146,6 +146,7 @@ export function loadConfig() {
   const ruleta4ScheduleRaw = (process.env.RULETA4_SCHEDULE || '').trim()
   const araucoScheduleRaw = (process.env.ARAUCO_SCHEDULE || '').trim()
   const niuScheduleRaw = (process.env.NIU_SCHEDULE || '').trim()
+  const niu25ScheduleRaw = (process.env.NIU25_SCHEDULE || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -224,6 +225,20 @@ export function loadConfig() {
       }
     : null
 
+  const niu25DefaultLimits = {
+    botella: envInt('NIU25_PRIZE_BOTELLA', 5),
+    bolsa: envInt('NIU25_PRIZE_BOLSA', 17),
+    salsa_soya: envInt('NIU25_PRIZE_SALSA_SOYA', 9),
+    salsa_unagui: envInt('NIU25_PRIZE_SALSA_UNAGUI', 9),
+    chapita: envInt('NIU25_PRIZE_CHAPITA', 30)
+  }
+  const niu25 = niu25ScheduleRaw
+    ? {
+        schedule: parseChicureoSchedule(niu25ScheduleRaw),
+        defaultLimits: niu25DefaultLimits
+      }
+    : null
+
   if (chicureo) {
     const n = chicureo.schedule.length
     if (n !== 6) {
@@ -256,7 +271,8 @@ export function loadConfig() {
       bellavista,
       ruleta4,
       arauco,
-      niu
+      niu,
+      niu25
     }
   }
 
@@ -291,6 +307,7 @@ export function loadConfig() {
     bellavista,
     ruleta4,
     arauco,
-    niu
+    niu,
+    niu25
   }
 }

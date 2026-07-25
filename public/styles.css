@@ -472,6 +472,355 @@ body.ruleta6 {
 }
 
 /*
+  Ruleta 7 (NIU25): escenario negro con dos focos laterales
+  apuntando a la ruleta (luz de escenario).
+*/
+body.ruleta7 {
+  color: var(--text);
+  background-color: #000000;
+  background-image: none;
+  position: relative;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+html:has(body.ruleta7) {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/*
+  Focos de escenario: la lámpara es solo una referencia pequeña;
+  lo que debe notarse es el cono de luz hacia la ruleta.
+  Tamaños en vw/vh para que mobile, tablet y desktop mantengan proporción.
+*/
+body.ruleta7 .stage-light {
+  --head-size: clamp(18px, 2.6vw, 34px);
+  --beam-length: clamp(90vh, 115vh, 140vh);
+  --beam-spread: clamp(50vw, 62vw, 74vw);
+  --beam-tilt: 34deg;
+  --beam-blur: clamp(18px, 3.2vw, 36px);
+  position: fixed;
+  top: clamp(10px, 2.2vh, 36px);
+  width: var(--head-size);
+  height: var(--head-size);
+  z-index: 1;
+  pointer-events: none;
+}
+
+body.ruleta7 .stage-light--left {
+  left: clamp(8px, 2.8vw, 48px);
+}
+
+body.ruleta7 .stage-light--right {
+  right: clamp(8px, 2.8vw, 48px);
+}
+
+body.ruleta7 .stage-light__head {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #fffdf6 0 22%, #ffe6ac 34%, #cf9a46 48%, #3d3d3d 54% 72%, #131313 78%);
+  border: 2px solid #565656;
+  box-shadow:
+    0 0 0 1px #090909,
+    0 3px 10px rgba(0, 0, 0, 0.8),
+    0 0 14px rgba(255, 232, 175, 0.7),
+    inset 0 0 8px rgba(255, 255, 255, 0.45);
+}
+
+/* Halo suave en el lente: une visualmente la carcasa con el haz. */
+body.ruleta7 .stage-light__head::after {
+  content: '';
+  position: absolute;
+  inset: -90%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 240, 205, 0.5) 0%, rgba(255, 220, 165, 0.16) 40%, transparent 72%);
+  mix-blend-mode: screen;
+}
+
+/*
+  Cono: vértice en el lente y base ancha hacia la ruleta.
+  El blur del contenedor difumina el borde del clip-path.
+*/
+body.ruleta7 .stage-light__beam {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--beam-spread);
+  height: var(--beam-length);
+  margin-left: calc(-1 * var(--beam-spread) / 2);
+  z-index: 1;
+  opacity: 0.68;
+  filter: blur(var(--beam-blur));
+  mix-blend-mode: screen;
+  transform-origin: 50% 0;
+  animation: niu25BeamBreathe 7.5s ease-in-out infinite;
+  /* El haz se apaga al llegar al piso: no corta seco. */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 96%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 96%);
+}
+
+body.ruleta7 .stage-light__beam::before,
+body.ruleta7 .stage-light__beam::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* Penumbra: cono ancho; el fade se retrasa para llegar cerca de la ruleta. */
+body.ruleta7 .stage-light__beam::before {
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 233, 186, 0.95) 0%,
+    rgba(255, 206, 128, 0.42) 18%,
+    rgba(255, 185, 96, 0.22) 42%,
+    rgba(255, 176, 88, 0.1) 68%,
+    rgba(255, 176, 88, 0.04) 86%,
+    transparent 100%
+  );
+}
+
+/* Núcleo del haz: más angosto y cálido, también más largo. */
+body.ruleta7 .stage-light__beam::after {
+  clip-path: polygon(48.5% 0, 51.5% 0, 72% 100%, 28% 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 248, 226, 1) 0%,
+    rgba(255, 226, 168, 0.48) 22%,
+    rgba(255, 205, 124, 0.2) 52%,
+    rgba(255, 205, 124, 0.08) 78%,
+    transparent 96%
+  );
+}
+
+body.ruleta7 .stage-light--left .stage-light__beam {
+  transform: rotate(calc(-1 * var(--beam-tilt)));
+}
+
+body.ruleta7 .stage-light--right .stage-light__beam {
+  transform: rotate(var(--beam-tilt));
+  animation-delay: -3.2s;
+}
+
+@keyframes niu25BeamBreathe {
+  0%,
+  100% {
+    opacity: 0.64;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+/* Tablet: faro discreto, haz largo hasta la zona de la ruleta. */
+@media (max-width: 1024px) {
+  body.ruleta7 .stage-light {
+    --head-size: clamp(16px, 2.2vw, 28px);
+    --beam-length: clamp(75vh, 100vh, 115vh);
+    --beam-spread: clamp(50vw, 60vw, 70vw);
+    --beam-tilt: 38deg;
+    --beam-blur: clamp(16px, 2.8vw, 28px);
+    top: clamp(8px, 1.8vh, 28px);
+  }
+}
+
+/* Mobile / kiosko estrecho: el haz sigue siendo lo visible y llega a la rueda. */
+@media (max-width: 640px) {
+  body.ruleta7 .stage-light {
+    --head-size: clamp(14px, 4.2vw, 22px);
+    --beam-length: clamp(70vh, 95vh, 110vh);
+    --beam-spread: clamp(56vw, 72vw, 84vw);
+    --beam-tilt: 34deg;
+    --beam-blur: clamp(14px, 4vw, 24px);
+    top: clamp(6px, 1.4vh, 20px);
+  }
+
+  body.ruleta7 .stage-light--left {
+    left: clamp(6px, 3vw, 18px);
+  }
+
+  body.ruleta7 .stage-light--right {
+    right: clamp(6px, 3vw, 18px);
+  }
+}
+
+/* Pozo de luz detrás de la ruleta (volumen en el aire). */
+body.ruleta7 .wheel-stage {
+  position: relative;
+  z-index: 1;
+}
+
+body.ruleta7 .wheel-stage::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  transform: translate(-50%, -50%);
+  width: min(96vw, 560px);
+  height: min(96vw, 560px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(255, 252, 238, 0.28) 0%,
+    rgba(255, 218, 155, 0.12) 30%,
+    rgba(227, 29, 27, 0.08) 50%,
+    transparent 72%
+  );
+}
+
+/*
+  Piso de escenario anclado al panel: siempre bajo el botón GIRAR,
+  aunque el layout se centre en vertical.
+*/
+body.ruleta7 .panel {
+  position: relative;
+  z-index: 1;
+}
+
+body.ruleta7 .panel::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: min(140vw, 720px);
+  height: min(48vw, 220px);
+  transform: translate(-50%, -20%) scaleY(0.7);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 74% 60% at 50% 40%,
+    rgba(255, 246, 220, 0.55) 0%,
+    rgba(255, 214, 150, 0.3) 22%,
+    rgba(255, 180, 100, 0.12) 48%,
+    transparent 78%
+  );
+  filter: blur(2px);
+  mix-blend-mode: screen;
+}
+
+body.ruleta7 .stage-floor {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(160vw, 1280px);
+  height: min(58vw, 460px);
+  transform: translate(-50%, 8%) scaleY(0.72);
+  z-index: 0;
+  pointer-events: none;
+  /* El pozo principal ahora vive en .panel::before; esto es spill ambiente. */
+  opacity: 0.55;
+}
+
+body.ruleta7 .stage-floor__pool {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 74% 60% at 50% 38%,
+    rgba(255, 246, 220, 0.58) 0%,
+    rgba(255, 214, 150, 0.34) 20%,
+    rgba(255, 180, 100, 0.16) 44%,
+    rgba(80, 40, 10, 0.07) 66%,
+    transparent 82%
+  );
+  filter: blur(1px);
+  mix-blend-mode: screen;
+  opacity: 1;
+}
+
+/* Manchas donde aterriza cada haz: más claras y desplazadas a los lados. */
+body.ruleta7 .stage-floor__spill {
+  position: absolute;
+  top: 6%;
+  width: 48%;
+  height: 82%;
+  border-radius: 50%;
+  filter: blur(16px);
+  mix-blend-mode: screen;
+  opacity: 0.95;
+}
+
+body.ruleta7 .stage-floor__spill--left {
+  left: -4%;
+  background: radial-gradient(
+    ellipse 65% 55% at 58% 40%,
+    rgba(255, 240, 200, 0.78) 0%,
+    rgba(255, 205, 130, 0.36) 34%,
+    transparent 74%
+  );
+}
+
+body.ruleta7 .stage-floor__spill--right {
+  right: -4%;
+  background: radial-gradient(
+    ellipse 65% 55% at 42% 40%,
+    rgba(255, 240, 200, 0.78) 0%,
+    rgba(255, 205, 130, 0.36) 34%,
+    transparent 74%
+  );
+}
+
+/* Plano de piso: franja inferior más cálida, como escenario oscuro. */
+body.ruleta7::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 55vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 95% 60% at 50% 100%, rgba(55, 36, 14, 0.72) 0%, rgba(22, 14, 6, 0.4) 38%, transparent 72%),
+    linear-gradient(180deg, transparent 0%, rgba(12, 8, 4, 0.35) 55%, rgba(8, 5, 2, 0.7) 100%);
+}
+
+@media (max-width: 1024px) {
+  body.ruleta7 .stage-floor {
+    top: 50%;
+    width: min(170vw, 1100px);
+    height: min(62vw, 400px);
+    transform: translate(-50%, 0) scaleY(0.7);
+  }
+}
+
+@media (max-width: 640px) {
+  body.ruleta7 .stage-floor {
+    top: 48%;
+    width: 190vw;
+    height: 70vw;
+    transform: translate(-50%, 0) scaleY(0.68);
+  }
+
+  body.ruleta7 .stage-floor__spill {
+    width: 54%;
+    opacity: 0.9;
+  }
+
+  body.ruleta7::after {
+    height: 48vh;
+  }
+}
+
+body.ruleta7 .wheel-frame {
+  position: relative;
+  z-index: 1;
+  /* Deja que el puntero se incline fuera del círculo sin recortarse. */
+  overflow: visible;
+}
+
+/*
   Ruleta 5 (Bellavista): misma estructura de halos que Chicureo,
   paleta negro · blanco · rojo.
 */
@@ -492,13 +841,15 @@ body.ruleta5 {
 
 body.ruleta3 .subtitle,
 body.ruleta5 .subtitle,
-body.ruleta6 .subtitle {
+body.ruleta6 .subtitle,
+body.ruleta7 .subtitle {
   color: #c9bcb8;
 }
 
 body.ruleta3 .result,
 body.ruleta5 .result,
-body.ruleta6 .result {
+body.ruleta6 .result,
+body.ruleta7 .result {
   color: #e0d8d6;
 }
 
@@ -510,6 +861,11 @@ body.ruleta3 .result--prize {
 body.ruleta6 .result--prize {
   color: #fff;
   text-shadow: 0 2px 14px rgba(214, 16, 22, 0.45);
+}
+
+body.ruleta7 .result--prize {
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(227, 29, 27, 0.5);
 }
 
 body.ruleta5 .result--prize {
@@ -524,6 +880,7 @@ body.ruleta2 .pointer,
 body.ruleta3 .pointer,
 body.ruleta5 .pointer,
 body.ruleta6 .pointer,
+body.ruleta7 .pointer,
 body.ruleta-arauco .pointer {
   clip-path: none;
   overflow: visible;
@@ -534,6 +891,7 @@ body.ruleta2 .pointer::before,
 body.ruleta3 .pointer::before,
 body.ruleta5 .pointer::before,
 body.ruleta6 .pointer::before,
+body.ruleta7 .pointer::before,
 body.ruleta-arauco .pointer::before {
   display: none;
 }
@@ -542,6 +900,7 @@ body.ruleta2 .pointer::after,
 body.ruleta3 .pointer::after,
 body.ruleta5 .pointer::after,
 body.ruleta6 .pointer::after,
+body.ruleta7 .pointer::after,
 body.ruleta-arauco .pointer::after {
   inset: 0;
   clip-path: none;
@@ -556,6 +915,7 @@ body.ruleta2 .pointer-cover,
 body.ruleta3 .pointer-cover,
 body.ruleta5 .pointer-cover,
 body.ruleta6 .pointer-cover,
+body.ruleta7 .pointer-cover,
 body.ruleta-arauco .pointer-cover {
   clip-path: none;
   background-color: transparent;
@@ -563,6 +923,59 @@ body.ruleta-arauco .pointer-cover {
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
+}
+
+/* Ruleta 7: un solo puntero (sin cover rojo) pivota desde la punta superior. */
+body.ruleta7 .pointer-cover {
+  display: none;
+}
+
+body.ruleta7 .pointer {
+  top: 0.35%;
+  width: 9.5%;
+  height: 11.5%;
+  z-index: 7;
+  transform-origin: 50% 8%;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.65));
+}
+
+body.ruleta7 .pointer::after {
+  /* Contorno negro un poco más grueso para leerse sobre el borde rojo del SVG. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%23fab918' stroke='%23000000' stroke-width='7' stroke-linejoin='round' stroke-linecap='round' paint-order='stroke fill' d='M 50 92 L 14 18 L 86 18 Z'/%3E%3C/svg%3E");
+}
+
+/* Halo de impacto al detenerse: anillo que sale del centro. */
+body.ruleta7 .wheel-impact-halo {
+  position: absolute;
+  inset: 8%;
+  z-index: 3;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 0 0 rgba(227, 29, 27, 0.55);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 62%);
+}
+
+body.ruleta7 .wheel-impact-halo--flash {
+  animation: niu25ImpactHalo 620ms cubic-bezier(0.16, 0.84, 0.28, 1) both;
+}
+
+@keyframes niu25ImpactHalo {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.72);
+    box-shadow: 0 0 0 0 rgba(227, 29, 27, 0.55);
+  }
+  55% {
+    opacity: 0.45;
+    transform: scale(1.06);
+    box-shadow: 0 0 0 18px rgba(227, 29, 27, 0.12);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+    box-shadow: 0 0 0 28px rgba(227, 29, 27, 0);
+  }
 }
 
 /*
@@ -573,6 +986,7 @@ body.ruleta2 .wheel-spin,
 body.ruleta3 .wheel-spin,
 body.ruleta5 .wheel-spin,
 body.ruleta6 .wheel-spin,
+body.ruleta7 .wheel-spin,
 body.ruleta-arauco .wheel-spin {
   will-change: auto;
   overflow: hidden;
@@ -586,6 +1000,7 @@ body.ruleta2 .wheel-spin--loading,
 body.ruleta3 .wheel-spin--loading,
 body.ruleta5 .wheel-spin--loading,
 body.ruleta6 .wheel-spin--loading,
+body.ruleta7 .wheel-spin--loading,
 body.ruleta-arauco .wheel-spin--loading {
   opacity: 0.94;
 }
@@ -594,8 +1009,14 @@ body.ruleta2 .wheel-spin.wheel-spin--animating,
 body.ruleta3 .wheel-spin.wheel-spin--animating,
 body.ruleta5 .wheel-spin.wheel-spin--animating,
 body.ruleta6 .wheel-spin.wheel-spin--animating,
+body.ruleta7 .wheel-spin.wheel-spin--animating,
 body.ruleta-arauco .wheel-spin.wheel-spin--animating {
   will-change: transform;
+}
+
+/* Ruleta 7: giro más largo, arranque vivo y frenado suave al final. */
+body.ruleta7 .wheel-spin {
+  transition: transform 8.8s cubic-bezier(0.12, 0.88, 0.05, 1);
 }
 
 body.ruleta2 .wheel-spin svg.wheel-svg-inline,
@@ -603,12 +1024,14 @@ body.ruleta3 .wheel-spin svg.wheel-svg-inline,
 body.ruleta4 .wheel-spin svg.wheel-svg-inline,
 body.ruleta5 .wheel-spin svg.wheel-svg-inline,
 body.ruleta6 .wheel-spin svg.wheel-svg-inline,
+body.ruleta7 .wheel-spin svg.wheel-svg-inline,
 body.ruleta-arauco .wheel-spin svg.wheel-svg-inline,
 body.ruleta2 .wheel-img,
 body.ruleta3 .wheel-img,
 body.ruleta4 .wheel-img,
 body.ruleta5 .wheel-img,
 body.ruleta6 .wheel-img,
+body.ruleta7 .wheel-img,
 body.ruleta-arauco .wheel-img {
   display: block;
   width: 100%;
@@ -672,9 +1095,38 @@ body.ruleta6 .app {
   z-index: 2;
 }
 
+/*
+  Ruleta 7: en pantallas altas (mobile/tablet) el bloque queda centrado
+  verticalmente para no dejar un vacío muerto abajo.
+*/
+body.ruleta7 .app {
+  position: relative;
+  z-index: 2;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  padding-top: clamp(8px, 2vh, 18px);
+  padding-bottom: max(clamp(24px, 5vh, 48px), env(safe-area-inset-bottom));
+}
+
+body.ruleta7 .header {
+  margin-bottom: clamp(6px, 1.6vh, 14px);
+}
+
+body.ruleta7 .wheel-stage {
+  margin: clamp(4px, 1.2vh, 12px) 0 clamp(12px, 2.4vh, 22px);
+}
+
+body.ruleta7 .panel {
+  margin-top: 0;
+}
+
 body.ruleta3 .confetti-root,
 body.ruleta5 .confetti-root,
-body.ruleta6 .confetti-root {
+body.ruleta6 .confetti-root,
+body.ruleta7 .confetti-root {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -682,9 +1134,15 @@ body.ruleta6 .confetti-root {
   overflow: hidden;
 }
 
+body.ruleta7 .confetti-root {
+  /* En NIU25 el confeti debe cruzar por delante de la rueda y los focos. */
+  z-index: 20;
+}
+
 body.ruleta3 .confetti-piece,
 body.ruleta5 .confetti-piece,
-body.ruleta6 .confetti-piece {
+body.ruleta6 .confetti-piece,
+body.ruleta7 .confetti-piece {
   position: absolute;
   top: -24px;
   width: 8px;
@@ -694,6 +1152,261 @@ body.ruleta6 .confetti-piece {
   animation-timing-function: linear;
   animation-fill-mode: forwards;
   box-shadow: 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/*
+  Ruleta 7: animaciones de giro y cierre.
+
+  El rebote/pop van en .wheel-rim y no en .wheel-spin porque este último lleva un
+  transform inline que app7.js usa como acumulador de rotación entre giros;
+  al ser padre e hijo, los transforms se componen sin pisarse.
+*/
+
+/* Puntero: ticks densos al inicio (giro rápido) y cada vez más suaves al frenar. */
+body.ruleta7 .pointer--drag {
+  animation: niu25PointerDrag var(--wheel-spin-duration, 8800ms) linear both;
+}
+
+@keyframes niu25PointerDrag {
+  0% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  3% {
+    transform: translateX(-50%) rotate(16deg);
+  }
+  7% {
+    transform: translateX(-50%) rotate(3deg);
+  }
+  11% {
+    transform: translateX(-50%) rotate(17deg);
+  }
+  15% {
+    transform: translateX(-50%) rotate(4deg);
+  }
+  20% {
+    transform: translateX(-50%) rotate(15deg);
+  }
+  25% {
+    transform: translateX(-50%) rotate(5deg);
+  }
+  31% {
+    transform: translateX(-50%) rotate(14deg);
+  }
+  37% {
+    transform: translateX(-50%) rotate(4deg);
+  }
+  44% {
+    transform: translateX(-50%) rotate(11deg);
+  }
+  52% {
+    transform: translateX(-50%) rotate(3deg);
+  }
+  60% {
+    transform: translateX(-50%) rotate(8deg);
+  }
+  68% {
+    transform: translateX(-50%) rotate(2deg);
+  }
+  76% {
+    transform: translateX(-50%) rotate(5.5deg);
+  }
+  84% {
+    transform: translateX(-50%) rotate(1.4deg);
+  }
+  91% {
+    transform: translateX(-50%) rotate(2.8deg);
+  }
+  96% {
+    transform: translateX(-50%) rotate(0.6deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+}
+
+/* Solo rebote angular suave — sin scale. */
+body.ruleta7 .wheel-rim--settle {
+  animation: niu25WheelSettle 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes niu25WheelSettle {
+  0% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-0.7deg);
+  }
+  72% {
+    transform: rotate(0.28deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+body.ruleta7 .pointer--kick {
+  animation: niu25PointerKick 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes niu25PointerKick {
+  0% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  22% {
+    transform: translateX(-50%) rotate(5deg);
+  }
+  52% {
+    transform: translateX(-50%) rotate(-1.6deg);
+  }
+  78% {
+    transform: translateX(-50%) rotate(0.7deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+}
+
+/*
+  Slot fijo para el mensaje: alto en rem (no em) para que al crecer la fuente
+  del premio no empuje ruleta/botón cuando .app está centrado en vertical.
+*/
+body.ruleta7 .result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(92vw, 28em);
+  width: 100%;
+  height: 5.75rem;
+  min-height: 5.75rem;
+  margin-top: 14px;
+  overflow: visible;
+  /* Fuente base estable: el tamaño grande vive solo en el span interno. */
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+body.ruleta7 .result--prize,
+body.ruleta7 .result--siga {
+  font-size: 1rem;
+}
+
+body.ruleta7 .prize-announce__message {
+  display: block;
+  font-family: 'Fredoka One', 'Fredoka', cursive, sans-serif;
+  font-size: clamp(1.2rem, 5.2vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  word-break: break-word;
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+body.ruleta7 .prize-announce__message--win {
+  color: #fff;
+  text-shadow:
+    0 0 24px rgba(227, 29, 27, 0.55),
+    0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+body.ruleta7 .prize-announce__message--siga {
+  color: #f0e6e4;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* El pop escala el texto interno; el slot externo no cambia de tamaño. */
+body.ruleta7 .result--prize--enter {
+  animation: none;
+}
+
+body.ruleta7 .result--prize--enter .prize-announce__message {
+  animation: niu25PrizePop 780ms cubic-bezier(0.16, 1.2, 0.32, 1) both;
+}
+
+@keyframes niu25PrizePop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.55);
+    filter: blur(2px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.16);
+    filter: blur(0);
+  }
+  78% {
+    transform: translateY(0) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+body.ruleta7 .result--prize--exit {
+  animation: none;
+}
+
+body.ruleta7 .result--prize--exit .prize-announce__message {
+  animation: niu25PrizeExit 620ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes niu25PrizeExit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+}
+
+/* Pulso del botón mientras gira. */
+body.ruleta7 .spin-btn--busy {
+  animation: niu25BtnPulse 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes niu25BtnPulse {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.3) inset,
+      0 14px 28px rgba(214, 16, 22, 0.45);
+  }
+  50% {
+    filter: brightness(1.1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.4) inset,
+      0 18px 36px rgba(227, 29, 27, 0.7);
+  }
+}
+
+/* Cañón radial: posición inicial inline (centro de la rueda), vector en --dx/--dy. */
+body.ruleta7 .confetti-piece--burst {
+  top: auto;
+  margin-left: -4px;
+  margin-top: -4px;
+  animation-name: niu25ConfettiBurst;
+  animation-timing-function: cubic-bezier(0.12, 0.75, 0.3, 1);
+}
+
+@keyframes niu25ConfettiBurst {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.7);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * 0.14), calc(var(--dy) * 0.14)) rotate(calc(var(--rot) * 0.15)) scale(1);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.85);
+    opacity: 0;
+  }
 }
 
 @keyframes wheelConfettiFall {
@@ -874,9 +1587,23 @@ body.ruleta-arauco .confetti-piece {
   body.ruleta4 .confetti-piece,
   body.ruleta5 .confetti-piece,
   body.ruleta6 .confetti-piece,
+  body.ruleta7 .confetti-piece,
   body.ruleta-arauco .confetti-piece {
     animation: none !important;
     opacity: 0 !important;
     visibility: hidden !important;
+  }
+
+  body.ruleta7 .wheel-rim--settle,
+  body.ruleta7 .pointer--kick,
+  body.ruleta7 .pointer--drag,
+  body.ruleta7 .wheel-impact-halo--flash,
+  body.ruleta7 .spin-btn--busy,
+  body.ruleta7 .result--prize--enter,
+  body.ruleta7 .result--prize--exit,
+  body.ruleta7 .result--prize--enter .prize-announce__message,
+  body.ruleta7 .result--prize--exit .prize-announce__message,
+  body.ruleta7 .stage-light__beam {
+    animation: none !important;
   }
 }

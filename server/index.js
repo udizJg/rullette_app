@@ -17,6 +17,7 @@ import {
 import { applyRuleta4SpinMutation, RULETA4_PRIZE_KEYS, RULETA4_RESULT_LABELS } from './lib/ruleta4SpinService.js'
 import { applyAraucoSpinMutation, ARAUCO_PRIZE_KEYS, ARAUCO_RESULT_LABELS } from './lib/araucoSpinService.js'
 import { applyNiuSpinMutation, NIU_PRIZE_LABELS, NIU_PRIZE_KEYS } from './lib/niuSpinService.js'
+import { applyNiu25SpinMutation, NIU25_PRIZE_KEYS, NIU25_RESULT_LABELS } from './lib/niu25SpinService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -199,6 +200,22 @@ function cleanupNiuDevLogs(dayKey) {
   }
 }
 
+function cleanupNiu25DevLogs(dayKey) {
+  if (!isDevelopment) return
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    const files = fs.readdirSync(logsDir)
+    for (const fileName of files) {
+      if (!fileName.startsWith('niu25-spins-') || !fileName.endsWith('.log')) continue
+      if (fileName !== `niu25-spins-${dayKey}.log`) {
+        fs.unlinkSync(path.join(logsDir, fileName))
+      }
+    }
+  } catch (err) {
+    console.error('No se pudo limpiar logs NIU25 de dev:', err?.message || err)
+  }
+}
+
 function cleanupRuleta4DevLogs(dayKey) {
   if (!isDevelopment) return
   try {
@@ -282,6 +299,24 @@ function writeNiuSpinLog(dayKey, entry) {
     console.log(`[NIU][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
   } catch (err) {
     console.error('No se pudo escribir log NIU:', err?.message || err)
+  }
+}
+
+function writeNiu25SpinLog(dayKey, entry) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true })
+    if (isDevelopment) {
+      cleanupNiu25DevLogs(dayKey)
+    }
+    const line = `${JSON.stringify(entry)}\n`
+    const logFile = path.join(logsDir, `niu25-spins-${dayKey}.log`)
+    fs.appendFileSync(logFile, line, 'utf8')
+    const code = entry?.code || 'unknown'
+    const prize = entry?.prize || '-'
+    const deltaOk = entry?.deltaValidation?.valid
+    console.log(`[NIU25][${dayKey}] code=${code} premio=${prize} delta_ok=${deltaOk}`)
+  } catch (err) {
+    console.error('No se pudo escribir log NIU25:', err?.message || err)
   }
 }
 
@@ -534,6 +569,46 @@ function getNiuDaySnapshot(dayKey) {
   return { inventory: { ...d.inventory }, spins: { ...d.spins } }
 }
 
+function niu25NowContext() {
+  if (!config.niu25) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      nowInTz: null,
+      dayIndex: null,
+      dayKey: null,
+      win: null
+    }
+  }
+  const sch = resolveScheduleDay(new Date(), config.niu25.schedule, config.tz)
+  if (!sch.ok) {
+    return {
+      ok: false,
+      reason: sch.reason,
+      nowInTz: sch.now,
+      dayIndex: sch.dayIndex,
+      dayKey: sch.dayKey,
+      win: null
+    }
+  }
+  return {
+    ok: true,
+    nowInTz: sch.now,
+    dayIndex: sch.dayIndex,
+    dayKey: sch.dayKey,
+    win: sch.win
+  }
+}
+
+function getNiu25DaySnapshot(dayKey) {
+  const state = store.readSync()
+  const d = state.niu25?.days?.[dayKey]
+  if (!d) {
+    return { inventory: { ...config.niu25.defaultLimits }, spins: {} }
+  }
+  return { inventory: { ...d.inventory }, spins: { ...d.spins } }
+}
+
 function ruleta4NowContext() {
   if (!config.ruleta4) {
     return {
@@ -691,6 +766,27 @@ function buildBellavistaDayStats(inventory, defaultLimits) {
 
 function buildNiuDayStats(inventory, defaultLimits) {
   return buildScheduleDayStats(inventory, defaultLimits, NIU_PRIZE_KEYS)
+}
+
+/** Estadísticas del día solo para premios físicos (sin «Sigue participando»). */
+function buildNiu25DayStats(inventory, defaultLimits) {
+  const delivered = {}
+  const perPrize = {}
+  let totalPhysicalSpins = 0
+  for (const k of NIU25_PRIZE_KEYS) {
+    const initial = defaultLimits[k] ?? 0
+    const remaining = inventory[k] ?? 0
+    const n = Math.max(0, initial - remaining)
+    delivered[k] = n
+    totalPhysicalSpins += n
+    perPrize[k] = { initial, delivered: n, remaining }
+  }
+  return {
+    dailyInitial: { ...defaultLimits },
+    delivered,
+    perPrize,
+    totalPhysicalSpins
+  }
 }
 
 app.get('/api/status', (req, res) => {
@@ -881,6 +977,10 @@ function bellavistaSoldOutAll(inventory) {
 
 function niuSoldOutAll(inventory) {
   return !NIU_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
+}
+
+function niu25SoldOutAll(inventory) {
+  return !NIU25_PRIZE_KEYS.some(k => (inventory?.[k] ?? 0) > 0)
 }
 
 app.get('/api/chicureo/status', (req, res) => {
@@ -1284,6 +1384,145 @@ app.post('/api/niu/spin', (req, res) => {
     })
 })
 
+app.get('/api/niu25/status', (req, res) => {
+  if (!config.niu25) {
+    return res.json({
+      code: 'not_configured',
+      message: 'NIU25 no está configurado (NIU25_SCHEDULE).'
+    })
+  }
+
+  const ctx = niu25NowContext()
+  if (!ctx.ok) {
+    return res.json({
+      code: 'inactive_campaign',
+      reason: ctx.reason,
+      tz: config.tz,
+      activationDays: config.niu25.schedule.map(e => e.dayKey)
+    })
+  }
+
+  const { dayIndex, dayKey, win } = ctx
+  const effectiveWin = isDevelopment ? { ...win, active: true, reason: null } : win
+  const snap = getNiu25DaySnapshot(dayKey)
+  const soldOutAll = niu25SoldOutAll(snap.inventory)
+  const stats = buildNiu25DayStats(snap.inventory, config.niu25.defaultLimits)
+  const enforceOnePerParticipant = false
+
+  let participantStatus = null
+  const anonId = req.query.anonId
+  const fpId = req.query.fpId
+  if (anonId || fpId) {
+    const pk = participantKeyFromBody(anonId, fpId)
+    const played = enforceOnePerParticipant ? Boolean(snap.spins[pk]) : false
+    participantStatus = {
+      canSpin: effectiveWin.active && !soldOutAll && !played,
+      alreadyPlayed: played
+    }
+  }
+
+  return res.json({
+    code: 'ok',
+    tz: config.tz,
+    dayIndex,
+    dayKey,
+    activationDaysTotal: config.niu25.schedule.length,
+    window: {
+      active: effectiveWin.active,
+      reason: effectiveWin.reason,
+      label: effectiveWin.label,
+      start: effectiveWin.startDt?.toISO() ?? null,
+      end: effectiveWin.endExclusive?.toISO() ?? null
+    },
+    remaining: snap.inventory,
+    stats,
+    labels: NIU25_RESULT_LABELS,
+    soldOutAll,
+    participantStatus
+  })
+})
+
+app.post('/api/niu25/spin', (req, res) => {
+  if (!config.niu25) {
+    return res.status(503).json({
+      code: 'not_configured',
+      message: 'NIU25 no está configurado.'
+    })
+  }
+
+  const ctx = niu25NowContext()
+  if (!ctx.ok) {
+    return res.status(403).json({
+      code: 'inactive_campaign',
+      reason: ctx.reason
+    })
+  }
+
+  const { dayKey, win } = ctx
+  if (!win.active && !isDevelopment) {
+    return res.status(403).json({
+      code: 'outside_window',
+      message: 'La ruleta no está disponible en este horario.',
+      window: win.label
+    })
+  }
+
+  const { anonId, fpId, idempotencyKey } = req.body || {}
+  const hasAnon = String(anonId || '').trim().length > 0
+  const hasFp = String(fpId || '').trim().length > 0
+  if (!hasAnon && !hasFp) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'anonId o fpId requerido'
+    })
+  }
+
+  const participantKey = participantKeyFromBody(anonId, fpId)
+  const enforceOnePerParticipant = false
+
+  store
+    .runMutation(state => {
+      const prevDay = state.niu25?.days?.[dayKey]
+      const beforeInventory = prevDay ? { ...prevDay.inventory } : { ...config.niu25.defaultLimits }
+      // Un reintento con la misma idempotencyKey devuelve el payload cacheado y no vuelve a descontar.
+      const isReplay = Boolean(prevDay?.idempotency?.[participantKey]?.[idempotencyKey])
+      const result = applyNiu25SpinMutation(state, {
+        dayKey,
+        participantKey,
+        idempotencyKey,
+        defaultLimits: config.niu25.defaultLimits,
+        enforceOnePerParticipant
+      })
+      // El inventario del estado es la fuente de verdad: en los reintentos payload.remaining
+      // viene congelado del giro original y haría ver un delta que nunca ocurrió.
+      const afterInventory = { ...(state.niu25?.days?.[dayKey]?.inventory ?? beforeInventory) }
+      const rawPrize = result.payload?.prize
+      // Ni «Sigue participando» ni los reintentos consumen stock: el validador espera null.
+      const prizeForDelta = isReplay || rawPrize === 'siga_participando' ? null : (rawPrize ?? null)
+      const deltaCheck = validateInventoryDelta(beforeInventory, afterInventory, prizeForDelta)
+      writeNiu25SpinLog(dayKey, {
+        at: new Date().toISOString(),
+        mode: config.nodeEnv,
+        endpoint: '/api/niu25/spin',
+        code: result.payload?.code || 'unknown',
+        prize: rawPrize ?? null,
+        segmentIndex: result.payload?.segmentIndex,
+        replayed: isReplay,
+        inventoryBefore: beforeInventory,
+        inventoryAfter: afterInventory,
+        deltaValidation: deltaCheck
+      })
+      return result
+    })
+    .then(result => {
+      res.status(result.httpStatus).json(result.payload)
+    })
+    .catch(err => {
+      console.error(err)
+      res.status(500).json({ code: 'server_error', message: 'Error interno' })
+    })
+})
+
 app.get('/api/ruleta4/status', (req, res) => {
   if (!config.ruleta4) {
     return res.json({
@@ -1655,6 +1894,16 @@ app.listen(config.port, () => {
       `NIU locales: ${config.niu.schedule.length} día(s) (${first} → ${last}) · ` +
         `por día: pelota=${lim.pelota} lonchera=${lim.lonchera} botella=${lim.botella} ` +
         `stickers=${lim.stickers} morral=${lim.morral}`
+    )
+  }
+  if (config.niu25) {
+    const first = config.niu25.schedule[0]?.dayKey
+    const last = config.niu25.schedule[config.niu25.schedule.length - 1]?.dayKey
+    const lim = config.niu25.defaultLimits
+    console.log(
+      `NIU25: ${config.niu25.schedule.length} día(s) (${first} → ${last}) · ` +
+        `stock/día: botella=${lim.botella} bolsa=${lim.bolsa} salsa_soya=${lim.salsa_soya} ` +
+        `salsa_unagui=${lim.salsa_unagui} chapita=${lim.chapita} · 30% sigue participando`
     )
   }
 })
