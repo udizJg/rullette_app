@@ -116,6 +116,61 @@ export function parseChicureoSchedule(raw) {
   return entries
 }
 
+/**
+ * Inventario por día Irarrazaval: fecha,pelota,morral,tote,botella,lonchera|...
+ * Debe cubrir exactamente las fechas del schedule (sin extras ni faltantes).
+ */
+export function parseIrarrazavalInventory(raw, scheduleDayKeys) {
+  const segments = raw
+    .split('|')
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (segments.length === 0) {
+    throw new Error('IRARRAZAVAL_INVENTORY vacío')
+  }
+
+  const limitsByDay = {}
+  const prizeKeys = ['pelota', 'morral', 'tote', 'botella', 'lonchera']
+
+  for (let i = 0; i < segments.length; i += 1) {
+    const parts = segments[i].split(',').map(p => p.trim())
+    if (parts.length !== 6) {
+      throw new Error(
+        `IRARRAZAVAL_INVENTORY segmento ${i + 1}: usar fecha,pelota,morral,tote,botella,lonchera`
+      )
+    }
+    const [dayKey, ...counts] = parts
+    if (!DATE_RE.test(dayKey)) {
+      throw new Error(`IRARRAZAVAL_INVENTORY fecha inválida: "${dayKey}"`)
+    }
+    if (limitsByDay[dayKey]) {
+      throw new Error(`IRARRAZAVAL_INVENTORY fecha duplicada: ${dayKey}`)
+    }
+    const limits = {}
+    for (let j = 0; j < prizeKeys.length; j += 1) {
+      const n = parseInt(counts[j], 10)
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error(`IRARRAZAVAL_INVENTORY stock inválido en ${dayKey} (${prizeKeys[j]})`)
+      }
+      limits[prizeKeys[j]] = n
+    }
+    limitsByDay[dayKey] = limits
+  }
+
+  for (const dayKey of scheduleDayKeys) {
+    if (!limitsByDay[dayKey]) {
+      throw new Error(`IRARRAZAVAL_INVENTORY sin fila para fecha del schedule: ${dayKey}`)
+    }
+  }
+  for (const dayKey of Object.keys(limitsByDay)) {
+    if (!scheduleDayKeys.includes(dayKey)) {
+      throw new Error(`IRARRAZAVAL_INVENTORY fecha no presente en IRARRAZAVAL_SCHEDULE: ${dayKey}`)
+    }
+  }
+
+  return limitsByDay
+}
+
 export function parseDailyWindows(raw, expectedCount) {
   if (!raw || typeof raw !== 'string') {
     throw new Error('DAILY_WINDOWS no definido o inválido')
@@ -147,6 +202,8 @@ export function loadConfig() {
   const araucoScheduleRaw = (process.env.ARAUCO_SCHEDULE || '').trim()
   const niuScheduleRaw = (process.env.NIU_SCHEDULE || '').trim()
   const niu25ScheduleRaw = (process.env.NIU25_SCHEDULE || '').trim()
+  const irarrazavalScheduleRaw = (process.env.IRARRAZAVAL_SCHEDULE || '').trim()
+  const irarrazavalInventoryRaw = (process.env.IRARRAZAVAL_INVENTORY || '').trim()
 
   const defaultLimits = {
     pelota_corazon: envInt('PRIZE_PELOTA_CORAZON', 30),
@@ -239,6 +296,23 @@ export function loadConfig() {
       }
     : null
 
+  let irarrazaval = null
+  if (irarrazavalScheduleRaw) {
+    const schedule = parseChicureoSchedule(irarrazavalScheduleRaw)
+    if (!irarrazavalInventoryRaw) {
+      throw new Error('IRARRAZAVAL_SCHEDULE definido pero falta IRARRAZAVAL_INVENTORY')
+    }
+    irarrazaval = {
+      schedule,
+      limitsByDay: parseIrarrazavalInventory(
+        irarrazavalInventoryRaw,
+        schedule.map(e => e.dayKey)
+      )
+    }
+  } else if (irarrazavalInventoryRaw) {
+    throw new Error('IRARRAZAVAL_INVENTORY definido pero falta IRARRAZAVAL_SCHEDULE')
+  }
+
   if (chicureo) {
     const n = chicureo.schedule.length
     if (n !== 6) {
@@ -272,7 +346,8 @@ export function loadConfig() {
       ruleta4,
       arauco,
       niu,
-      niu25
+      niu25,
+      irarrazaval
     }
   }
 
@@ -308,6 +383,7 @@ export function loadConfig() {
     ruleta4,
     arauco,
     niu,
-    niu25
+    niu25,
+    irarrazaval
   }
 }
